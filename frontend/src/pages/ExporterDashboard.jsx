@@ -71,12 +71,12 @@ export default function ExporterDashboard({ walletAddress, onConnect }) {
       <div className="container">
         {/* ── Page Header ──────────────────────────────────────── */}
         <div style={{ marginBottom: 'var(--space-7)' }}>
-          <div className="section-label">Exporter Portal</div>
-          <h1 style={{ marginBottom: 'var(--space-3)' }}>
+          <div className="section-label" style={{ color: 'var(--color-saffron)' }}>Exporter Portal</div>
+          <h1 style={{ fontFamily: 'var(--font-display)', fontSize: '2.5rem', marginBottom: 'var(--space-3)' }}>
             Turn your receivables into{' '}
-            <span className="shine">working capital</span>
+            <span style={{ color: 'var(--color-teal)' }}>working capital</span>
           </h1>
-          <p className="text-secondary text-ui-lg" style={{ maxWidth: 600 }}>
+          <p className="text-secondary text-ui-md" style={{ maxWidth: 600 }}>
             Upload your shipping documents. Get paid the same day at a small discount.
             No banks, no paperwork delays.
           </p>

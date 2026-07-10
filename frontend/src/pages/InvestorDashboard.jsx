@@ -1,19 +1,14 @@
 import React, { useState, useEffect } from 'react';
-import ReceivableCard from '../components/ReceivableCard.jsx';
-import SharePurchaseModal from '../components/SharePurchaseModal.jsx';
-import LiveFeed from '../components/LiveFeed.jsx';
-import DexListingPanel from '../components/DexListingPanel.jsx';
 import { useReceivables } from '../hooks/useReceivables.js';
 import { receivablesApi, authApi, formatUsd, daysUntil, formatYield } from '../stellar/client.js';
+import StatCard from '../components/StatCard.jsx';
+import VerifiedBadge from '../components/VerifiedBadge.jsx';
 
 export default function InvestorDashboard({ walletAddress, onConnect }) {
   const { receivables, loading, refresh } = useReceivables({}, 10000);
-  const [selectedRec, setSelectedRec] = useState(null);
   const [kycStatus, setKycStatus] = useState(null);
   const [kycForm, setKycForm] = useState({ name: '', email: '', pan_number: '' });
   const [kycLoading, setKycLoading] = useState(false);
-  const [filter, setFilter] = useState('active');
-  const [portfolioTab, setPortfolioTab] = useState('open');
 
   // My investments — computed from all receivables
   const myInvestments = receivables.flatMap((r) =>
@@ -22,16 +17,13 @@ export default function InvestorDashboard({ walletAddress, onConnect }) {
       .map((inv) => ({ ...inv, receivable: r }))
   );
 
-  const openPositions = myInvestments.filter((i) => i.receivable?.status !== 'settled');
-  const closedPositions = myInvestments.filter((i) => i.receivable?.status === 'settled');
-
-  // Portfolio stats
+  // Portfolio metrics
   const totalDeployed = myInvestments.reduce((s, i) => s + i.payment_cents / 100, 0);
   const totalFaceValue = myInvestments.reduce((s, i) => s + i.share_cents / 100, 0);
   const expectedProfit = totalFaceValue - totalDeployed;
-  const avgYieldPct = totalDeployed > 0 ? (expectedProfit / totalDeployed * 100).toFixed(1) : 0;
+  const avgYieldPct = totalDeployed > 0 ? ((expectedProfit / totalDeployed) * 100).toFixed(1) : 0;
 
-  // KYC status
+  // KYC status check
   useEffect(() => {
     if (!walletAddress) return;
     authApi.checkWalletKyc(walletAddress).then(setKycStatus).catch(() => {});
@@ -50,416 +42,153 @@ export default function InvestorDashboard({ walletAddress, onConnect }) {
     setKycLoading(false);
   }
 
-  const filtered = receivables.filter((r) => {
-    if (filter === 'all') return true;
-    return r.status === filter;
-  });
-
   return (
     <main className="page-content">
       <div className="container">
-
-        {/* ── Header ─────────────────────────────────────────────── */}
+        {/* Header */}
         <div style={{ marginBottom: 'var(--space-6)' }}>
-          <div className="section-label">Investor Portal</div>
-          <h1 style={{ marginBottom: 'var(--space-3)' }}>
-            Earn real yield from{' '}
-            <span className="shine-saffron">Malabar exports</span>
+          <div className="section-label" style={{ color: 'var(--color-saffron)' }}>Investor Ledger</div>
+          <h1 style={{ marginBottom: 'var(--space-2)' }}>
+            Portfolio <span style={{ color: 'var(--color-teal)' }}>Summary</span>
           </h1>
-          <p className="text-secondary text-ui-lg" style={{ maxWidth: 580 }}>
-            Buy fractional shares of verified Kerala export receivables at a discount.
-            Backed by real shipping documents. Settled on Stellar.
+          <p className="text-secondary text-ui-sm">
+            Monitor and manage your fractional trade invoice investments.
           </p>
         </div>
 
-        {/* ── Wallet gate ─────────────────────────────────────────── */}
-        {!walletAddress && (
-          <div className="card" style={{ marginBottom: 'var(--space-6)', display: 'flex', gap: 'var(--space-5)', alignItems: 'center', flexWrap: 'wrap' }}>
-            <div style={{ fontSize: '2.5rem' }}>👜</div>
-            <div style={{ flex: 1, minWidth: 220 }}>
-              <h3 style={{ marginBottom: 'var(--space-2)' }}>Connect Your Wallet</h3>
-              <p className="text-secondary text-ui-sm">
-                Freighter wallet required to invest. KYC approval needed to receive receivable tokens
-                — we sponsor the XLM reserve so you don't need any.
-              </p>
-            </div>
-            <button className="btn btn-primary" onClick={onConnect} id="investor-connect-btn">
-              Connect Freighter
+        {/* Wallet Gate */}
+        {!walletAddress ? (
+          <div className="card" style={{ display: 'flex', flexDirection: 'column', gap: 'var(--space-4)', alignItems: 'center', textAlign: 'center', padding: 'var(--space-7)' }}>
+            <span style={{ fontSize: '2.5rem' }}>👛</span>
+            <h3>Freighter Wallet Required</h3>
+            <p className="text-secondary text-ui-sm" style={{ maxWidth: '400px' }}>
+              Connect your Freighter wallet to view your active holdings and submit KYC information for regulatory clearance.
+            </p>
+            <button className="btn btn-primary" onClick={onConnect}>
+              Connect Wallet
             </button>
           </div>
-        )}
-
-        {/* ── Portfolio Stats row (when invested) ─────────────────── */}
-        {walletAddress && myInvestments.length > 0 && (
-          <div className="grid-4" style={{ marginBottom: 'var(--space-6)' }}>
-            {[
-              { label: 'Positions',        value: myInvestments.length,                       color: 'var(--color-teal-light)' },
-              { label: 'Capital Deployed', value: formatUsd(totalDeployed * 100),             color: 'var(--color-saffron)'   },
-              { label: 'Face Value Held',  value: formatUsd(totalFaceValue * 100),            color: 'var(--color-text-primary)' },
-              { label: 'Expected Profit',  value: `+${formatUsd(expectedProfit * 100)}`,      color: 'var(--color-green-light)' },
-            ].map((s) => (
-              <div key={s.label} className="card stat-card">
-                <div className="stat-value" style={{ color: s.color, fontSize: '1.5rem' }}>{s.value}</div>
-                <div className="stat-label">{s.label}</div>
-              </div>
-            ))}
-          </div>
-        )}
-
-        <div className="grid-2" style={{ gap: 'var(--space-7)', alignItems: 'start' }}>
-
-          {/* ── Left: Marketplace ──────────────────────────────────── */}
-          <div>
-            <div className="flex items-center gap-3" style={{ marginBottom: 'var(--space-4)' }}>
-              <h3 style={{ fontFamily: 'var(--font-display)', flex: 1 }}>
-                Receivables Marketplace
-              </h3>
-              <div className="flex gap-2">
-                {[
-                  { key: 'active',   label: 'For Sale' },
-                  { key: 'attested', label: 'Attested' },
-                  { key: 'all',      label: 'All'      },
-                ].map((f) => (
-                  <button
-                    key={f.key}
-                    className={`btn btn-sm ${filter === f.key ? 'btn-primary' : 'btn-ghost'}`}
-                    onClick={() => setFilter(f.key)}
-                    id={`filter-${f.key}-btn`}
-                  >
-                    {f.label}
-                  </button>
-                ))}
-              </div>
-            </div>
-
-            {loading ? (
-              <div className="flex flex-col gap-4">
-                {[1, 2, 3].map((i) => (
-                  <div key={i} className="skeleton" style={{ height: 220 }} />
-                ))}
-              </div>
-            ) : filtered.length === 0 ? (
-              <div className="card" style={{ textAlign: 'center', padding: 'var(--space-7)' }}>
-                <div style={{ fontSize: '2rem', marginBottom: 'var(--space-3)' }}>🌊</div>
-                <div className="text-secondary">
-                  No {filter === 'active' ? 'open' : filter} receivables right now.
-                  <br />
-                  <span className="text-ui-xs text-muted">
-                    Ask an admin to register and attest a receivable, or run{' '}
-                    <span className="monospace">npm run seed</span> in the API.
-                  </span>
-                </div>
-              </div>
-            ) : (
-              <div className="flex flex-col gap-4">
-                {filtered.map((rec) => (
-                  <ReceivableCard
-                    key={rec.id}
-                    receivable={rec}
-                    showInvest
-                    onClick={() => setSelectedRec(rec)}
-                  />
-                ))}
-              </div>
-            )}
-          </div>
-
-          {/* ── Right column ───────────────────────────────────────── */}
-          <div className="flex flex-col gap-5">
-
-            {/* KYC Panel */}
-            <div className="card card-gold">
-              <h4 style={{ marginBottom: 'var(--space-3)', fontFamily: 'var(--font-display)' }}>
-                Identity Verification (KYC)
-              </h4>
-
-              {!walletAddress ? (
-                <div className="text-ui-sm text-muted">
-                  Connect your wallet to check KYC status
-                </div>
-              ) : kycStatus?.approved ? (
-                <div>
-                  <div className="alert alert-success" style={{ marginBottom: 'var(--space-3)' }}>
-                    <div>
-                      <div style={{ fontWeight: 700 }}>✓ KYC Approved</div>
-                      <div className="text-ui-sm">
-                        Your wallet is authorized to hold receivable tokens.
-                        Your trustline reserve is sponsored — no XLM needed.
-                      </div>
-                    </div>
-                  </div>
-                  <div className="text-ui-xs text-muted">
-                    <span className="badge badge-attested" style={{ fontSize: '0.62rem', marginRight: 6 }}>SEP-24</span>
-                    Verified via Stellar Anchor mock KYC flow
-                  </div>
-                </div>
-              ) : kycStatus?.kyc_status === 'pending' || kycStatus?.status === 'pending' ? (
-                <div>
-                  <div className="alert alert-warning">
-                    <div>
-                      <div style={{ fontWeight: 700 }}>⏳ KYC Under Review</div>
-                      <div className="text-ui-sm">
-                        Your application is with the compliance team.
-                        An admin will approve it shortly — visible in the Admin panel.
-                      </div>
-                    </div>
-                  </div>
-                </div>
-              ) : (
-                <form onSubmit={handleKycSubmit}>
-                  <p className="text-ui-sm text-secondary" style={{ marginBottom: 'var(--space-4)' }}>
-                    Required to receive receivable tokens (Stellar AUTH_REQUIRED).
-                    This mock SEP-24 flow collects basic details — replaced by
-                    a real Anchor in production.
+        ) : (
+          <div className="flex flex-col gap-6">
+            {/* KYC Banner */}
+            {kycStatus?.kyc_status !== 'approved' && (
+              <div 
+                className="card" 
+                style={{ 
+                  borderLeft: '4px solid var(--color-saffron)',
+                  background: 'var(--color-bg-elevated)',
+                  display: 'flex',
+                  gap: 'var(--space-4)',
+                  alignItems: 'start'
+                }}
+              >
+                <div style={{ fontSize: '1.5rem' }}>⚠️</div>
+                <div style={{ flex: 1 }}>
+                  <h4 style={{ color: 'var(--color-saffron)', marginBottom: '4px' }}>KYC Authorization Required</h4>
+                  <p className="text-ui-xs text-secondary" style={{ marginBottom: 'var(--space-3)' }}>
+                    {kycStatus?.kyc_status === 'pending'
+                      ? 'Your compliance documents are under review. Payouts will trigger once approved.'
+                      : 'You must complete investor verification before receiving tokenized trade shares.'}
                   </p>
-                  <div className="flex flex-col gap-3">
-                    <div className="form-group">
-                      <label className="form-label">Full Name</label>
-                      <input
-                        className="form-input"
-                        value={kycForm.name}
-                        onChange={(e) => setKycForm((f) => ({ ...f, name: e.target.value }))}
-                        placeholder="Your legal name"
-                        required
-                        id="kyc-name-input"
-                      />
-                    </div>
-                    <div className="form-group">
-                      <label className="form-label">Email</label>
-                      <input
-                        className="form-input"
-                        type="email"
-                        value={kycForm.email}
-                        onChange={(e) => setKycForm((f) => ({ ...f, email: e.target.value }))}
-                        placeholder="you@example.com"
-                        required
-                        id="kyc-email-input"
-                      />
-                    </div>
-                    <div className="form-group">
-                      <label className="form-label">PAN / Passport No.</label>
-                      <input
-                        className="form-input"
-                        value={kycForm.pan_number}
-                        onChange={(e) => setKycForm((f) => ({ ...f, pan_number: e.target.value }))}
-                        placeholder="ABCDE1234F"
-                        id="kyc-pan-input"
-                      />
-                    </div>
-                  </div>
-                  <button
-                    className="btn btn-primary btn-full"
-                    style={{ marginTop: 'var(--space-4)' }}
-                    type="submit"
-                    disabled={kycLoading}
-                    id="kyc-submit-btn"
-                  >
-                    {kycLoading ? 'Submitting…' : 'Start KYC (SEP-24 mock)'}
-                  </button>
-                </form>
-              )}
-            </div>
 
-            {/* Portfolio Panel */}
-            {walletAddress && myInvestments.length > 0 && (
-              <div className="card">
-                <div className="flex items-center gap-3" style={{ marginBottom: 'var(--space-4)' }}>
-                  <h4 style={{ fontFamily: 'var(--font-display)', flex: 1 }}>My Portfolio</h4>
-                  <div className="flex gap-2">
-                    {['open', 'closed'].map((t) => (
-                      <button
-                        key={t}
-                        className={`btn btn-sm ${portfolioTab === t ? 'btn-primary' : 'btn-ghost'}`}
-                        onClick={() => setPortfolioTab(t)}
-                        id={`portfolio-tab-${t}`}
-                        style={{ textTransform: 'capitalize' }}
-                      >
-                        {t}
+                  {kycStatus?.kyc_status !== 'pending' && (
+                    <form onSubmit={handleKycSubmit} style={{ display: 'flex', gap: '12px', flexWrap: 'wrap', maxWidth: '600px' }}>
+                      <input 
+                        type="text" 
+                        placeholder="Full Name" 
+                        className="form-input" 
+                        required 
+                        style={{ flex: 1, minWidth: '150px', padding: '6px 12px', fontSize: '0.85rem' }} 
+                        value={kycForm.name} 
+                        onChange={(e) => setKycForm({ ...kycForm, name: e.target.value })}
+                      />
+                      <input 
+                        type="email" 
+                        placeholder="Email Address" 
+                        className="form-input" 
+                        required 
+                        style={{ flex: 1, minWidth: '150px', padding: '6px 12px', fontSize: '0.85rem' }} 
+                        value={kycForm.email} 
+                        onChange={(e) => setKycForm({ ...kycForm, email: e.target.value })}
+                      />
+                      <input 
+                        type="text" 
+                        placeholder="PAN / Identity Number" 
+                        className="form-input" 
+                        required 
+                        style={{ flex: 1, minWidth: '150px', padding: '6px 12px', fontSize: '0.85rem' }} 
+                        value={kycForm.pan_number} 
+                        onChange={(e) => setKycForm({ ...kycForm, pan_number: e.target.value })}
+                      />
+                      <button className="btn btn-saffron btn-sm" type="submit" disabled={kycLoading}>
+                        Submit Details
                       </button>
-                    ))}
-                  </div>
-                </div>
-
-                <div className="flex flex-col gap-3">
-                  {(portfolioTab === 'open' ? openPositions : closedPositions).map((inv, idx) => (
-                    <PortfolioPosition
-                      key={idx}
-                      investment={inv}
-                      walletAddress={walletAddress}
-                      onDexSuccess={refresh}
-                    />
-                  ))}
-                  {(portfolioTab === 'open' ? openPositions : closedPositions).length === 0 && (
-                    <div className="text-ui-sm text-muted" style={{ textAlign: 'center', padding: 'var(--space-4)' }}>
-                      No {portfolioTab} positions
-                    </div>
+                    </form>
                   )}
                 </div>
-
-                {avgYieldPct > 0 && (
-                  <div style={{
-                    marginTop: 'var(--space-4)',
-                    paddingTop: 'var(--space-3)',
-                    borderTop: '1px solid var(--color-border)',
-                  }}>
-                    <div className="text-ui-xs text-muted">
-                      Blended portfolio return:{' '}
-                      <span style={{ color: 'var(--color-green-light)', fontWeight: 700 }}>
-                        +{avgYieldPct}%
-                      </span>{' '}
-                      on deployed capital
-                    </div>
-                  </div>
-                )}
               </div>
             )}
 
-            {/* Live Feed */}
-            <div className="card">
-              <LiveFeed walletAddress={walletAddress} />
+            {/* Portfolio Stats */}
+            <div className="grid-4" style={{ gap: 'var(--space-4)' }}>
+              <StatCard value={myInvestments.length} label="Active Holdings" valueColor="var(--color-text-primary)" />
+              <StatCard value={formatUsd(totalDeployed * 100)} label="Capital Deployed" valueColor="var(--color-teal)" />
+              <StatCard value={formatUsd(totalFaceValue * 100)} label="Face Value Yield" valueColor="var(--color-saffron)" />
+              <StatCard value={`+${formatUsd(expectedProfit * 100)}`} label="Projected Gains" valueColor="var(--color-green)" />
             </div>
 
-            {/* Stellar primitives info strip */}
-            <div style={{
-              padding: 'var(--space-4)',
-              background: 'rgba(13,154,168,0.04)',
-              border: '1px solid rgba(13,154,168,0.15)',
-              borderRadius: 'var(--radius-md)',
-            }}>
-              <div className="section-label" style={{ marginBottom: 'var(--space-3)' }}>Stellar Primitives</div>
-              {[
-                { icon: '🔐', label: 'AUTH_REQUIRED', desc: 'Only KYC-approved wallets receive tokens' },
-                { icon: '🛡️', label: 'CLAWBACK_ENABLED', desc: 'Fraud recovery at protocol level' },
-                { icon: '🤝', label: 'Sponsored Reserves', desc: 'Zero XLM required to hold tokens' },
-                { icon: '📊', label: 'Native DEX',  desc: 'Exit before maturity via ManageSellOffer' },
-              ].map((p) => (
-                <div key={p.label} className="flex items-center gap-2" style={{ marginBottom: 'var(--space-2)' }}>
-                  <span>{p.icon}</span>
-                  <span style={{ fontSize: '0.78rem', fontWeight: 600, color: 'var(--color-teal-light)' }}>
-                    {p.label}
-                  </span>
-                  <span className="text-ui-xs text-muted">— {p.desc}</span>
+            {/* Holdings Table */}
+            <div className="card">
+              <h3 style={{ fontFamily: 'var(--font-display)', marginBottom: 'var(--space-4)' }}>Your Active Positions</h3>
+              
+              {loading ? (
+                <div className="skeleton" style={{ height: '150px' }} />
+              ) : myInvestments.length === 0 ? (
+                <div style={{ textAlign: 'center', padding: 'var(--space-6) 0' }}>
+                  <p className="text-secondary text-ui-sm" style={{ marginBottom: 'var(--space-4)' }}>You have no open trade positions yet.</p>
+                  <Link to="/marketplace" className="btn btn-primary btn-sm">Explore Marketplace</Link>
                 </div>
-              ))}
+              ) : (
+                <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: '0.875rem' }}>
+                  <thead>
+                    <tr style={{ borderBottom: '1px solid var(--color-border)', textAlign: 'left', opacity: 0.6 }}>
+                      <th style={{ padding: '8px 12px' }} className="form-label">Asset / Manifest ID</th>
+                      <th style={{ padding: '8px 12px' }} className="form-label">Commodity</th>
+                      <th style={{ padding: '8px 12px' }} className="form-label">Face Value</th>
+                      <th style={{ padding: '8px 12px' }} className="form-label">Purchase Price</th>
+                      <th style={{ padding: '8px 12px' }} className="form-label">Days to Maturity</th>
+                      <th style={{ padding: '8px 12px' }} className="form-label">Status</th>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    {myInvestments.map((inv, idx) => {
+                      const days = daysUntil(inv.receivable?.maturity_date);
+                      return (
+                        <tr key={idx} style={{ borderBottom: '1px solid rgba(0,0,0,0.05)' }}>
+                          <td style={{ padding: '12px' }} className="monospace">
+                            <Link to={`/receivable/${inv.receivable_id}`} style={{ color: 'var(--color-teal)', fontWeight: 600 }}>
+                              #{inv.receivable_id} ({inv.receivable?.token_asset_code || 'MLREC'})
+                            </Link>
+                          </td>
+                          <td style={{ padding: '12px' }}>{inv.receivable?.commodity}</td>
+                          <td style={{ padding: '12px', fontWeight: 600 }}>{formatUsd(inv.share_cents)}</td>
+                          <td style={{ padding: '12px' }}>{formatUsd(inv.payment_cents)}</td>
+                          <td style={{ padding: '12px' }}>{days} Days</td>
+                          <td style={{ padding: '12px' }}>
+                            <span className={`badge badge-${inv.receivable?.status}`}>
+                              ● {inv.receivable?.status?.toUpperCase()}
+                            </span>
+                          </td>
+                        </tr>
+                      );
+                    })}
+                  </tbody>
+                </table>
+              )}
             </div>
           </div>
-        </div>
-
-        {/* ── Purchase Modal ─────────────────────────────────────── */}
-        {selectedRec && (
-          <SharePurchaseModal
-            receivable={selectedRec}
-            investorAddress={walletAddress}
-            onClose={() => setSelectedRec(null)}
-            onSuccess={() => {
-              setSelectedRec(null);
-              refresh();
-            }}
-          />
         )}
       </div>
     </main>
-  );
-}
-
-// ── Portfolio Position Row ────────────────────────────────────
-function PortfolioPosition({ investment, walletAddress, onDexSuccess }) {
-  const { receivable, share_cents, payment_cents } = investment;
-  const faceValueUsd = share_cents / 100;
-  const paidUsd = payment_cents / 100;
-  const profitUsd = faceValueUsd - paidUsd;
-  const days = receivable?.maturity_date ? daysUntil(receivable.maturity_date) : null;
-
-  const statusDot = {
-    pending: '#e8a020',
-    attested: 'var(--color-teal-light)',
-    active: 'var(--color-green-light)',
-    settled: '#8fa8ff',
-    clawback: '#f08080',
-  };
-
-  return (
-    <div style={{
-      padding: 'var(--space-3)',
-      background: 'rgba(255,255,255,0.03)',
-      border: '1px solid var(--color-border)',
-      borderRadius: 'var(--radius-md)',
-    }}>
-      <div className="flex items-center justify-between" style={{ marginBottom: 'var(--space-2)' }}>
-        <div>
-          <div className="flex items-center gap-2">
-            <div style={{
-              width: 8, height: 8, borderRadius: '50%',
-              background: statusDot[receivable?.status] || 'var(--color-border)',
-              flexShrink: 0,
-            }} />
-            <span style={{ fontWeight: 600, fontSize: '0.85rem' }}>
-              {receivable?.commodity || 'Receivable'} #{receivable?.id}
-            </span>
-          </div>
-          <div className="text-ui-xs text-muted" style={{ marginTop: 2, marginLeft: 16 }}>
-            {receivable?.buyer_name} · {receivable?.buyer_country} · {days !== null ? `${days}d to maturity` : 'matured'}
-          </div>
-        </div>
-        <div style={{ textAlign: 'right' }}>
-          <div style={{ fontWeight: 700, color: 'var(--color-teal-light)', fontSize: '0.9rem' }}>
-            {formatUsd(share_cents)}
-          </div>
-          <div className="text-ui-xs" style={{ color: profitUsd > 0 ? 'var(--color-green-light)' : 'var(--color-text-muted)' }}>
-            {profitUsd > 0 ? '+' : ''}{formatUsd(profitUsd * 100)} profit
-          </div>
-        </div>
-      </div>
-
-      {/* Progress bar showing time to maturity */}
-      {days !== null && receivable?.status !== 'settled' && (
-        <div style={{ marginBottom: 'var(--space-2)' }}>
-          <div style={{
-            height: 3, background: 'var(--color-border)',
-            borderRadius: 2, overflow: 'hidden',
-          }}>
-            <div style={{
-              height: '100%',
-              width: `${Math.max(5, 100 - (days / 90) * 100)}%`,
-              background: 'var(--gradient-brand)',
-              borderRadius: 2,
-            }} />
-          </div>
-        </div>
-      )}
-
-      {receivable?.token_asset_code && receivable?.status !== 'settled' && (
-        <DexListingPanel
-          investment={investment}
-          walletAddress={walletAddress}
-          onSuccess={onDexSuccess}
-        />
-      )}
-
-      {/* Token link */}
-      {receivable?.token_asset_code && (
-        <div style={{ marginTop: 4 }}>
-          {receivable.issuer_public_key && !receivable.issuer_public_key.startsWith('demo') ? (
-            <a
-              href={`https://stellar.expert/explorer/testnet/asset/${receivable.token_asset_code}-${receivable.issuer_public_key}`}
-              target="_blank"
-              rel="noopener noreferrer"
-              className="text-ui-xs"
-              style={{ color: 'var(--color-teal-light)', textDecoration: 'underline', opacity: 0.8 }}
-            >
-              {receivable.token_asset_code} on Stellar Expert ↗
-            </a>
-          ) : (
-            <span className="text-ui-xs text-muted">{receivable.token_asset_code} (local demo)</span>
-          )}
-        </div>
-      )}
-
-      {receivable?.status === 'settled' && (
-        <div className="text-ui-xs" style={{ color: '#8fa8ff', marginTop: 4 }}>
-          ✓ Settled — {formatUsd(share_cents)} returned to your wallet
-        </div>
-      )}
-    </div>
   );
 }

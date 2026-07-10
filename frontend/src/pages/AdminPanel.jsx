@@ -96,16 +96,16 @@ export default function AdminPanel({ walletAddress }) {
         {/* ── Header ──────────────────────────────────────────── */}
         <div style={{ marginBottom: 'var(--space-6)' }}>
           <div className="flex items-center gap-3" style={{ marginBottom: 'var(--space-2)' }}>
-            <div className="section-label" style={{ margin: 0 }}>Control Panel</div>
+            <div className="section-label" style={{ margin: 0, color: 'var(--color-saffron)' }}>Control Panel</div>
             <div className="badge badge-clawback" style={{ fontSize: '0.65rem' }}>
               ADMIN / ORACLE
             </div>
           </div>
-          <h1 style={{ marginBottom: 'var(--space-3)' }}>
+          <h1 style={{ fontFamily: 'var(--font-display)', fontSize: '2.5rem', marginBottom: 'var(--space-3)' }}>
             Demo Control{' '}
-            <span className="shine">Panel</span>
+            <span style={{ color: 'var(--color-teal)' }}>Panel</span>
           </h1>
-          <p className="text-secondary text-ui-lg">
+          <p className="text-secondary text-ui-md">
             Attest receivables, approve KYC, confirm payments, and trigger pro-rata distribution.
             All actions are on-chain (or demo mode without keys).
           </p>

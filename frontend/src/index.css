@@ -9,67 +9,72 @@
 
 /* ── CSS Variables (Design Tokens) ──────────────────────────── */
 :root {
-  /* Color Palette */
-  --color-bg-deep:      #060d12;        /* Deep midnight ocean */
-  --color-bg-base:      #0a1520;        /* Primary background */
-  --color-bg-surface:   #0f1f2e;        /* Card surfaces */
-  --color-bg-elevated:  #152538;        /* Elevated elements */
-  --color-bg-glass:     rgba(15, 31, 46, 0.7);
+  /* Color Palette — Coastal Ledger (Parchment & Ink) */
+  --color-bg-deep:      #F5F0E6;        /* Warm aged paper */
+  --color-bg-base:      #FAF8F5;        /* Premium parchment */
+  --color-bg-surface:   #FFFFFF;        /* Pure paper surface */
+  --color-bg-elevated:  #F2EDE0;        /* Shaded paper border */
+  --color-bg-glass:     rgba(250, 248, 245, 0.85);
+  
+  /* Contrast dark ink sections */
+  --color-bg-ink-dark:  #1A1712;        /* Dark warm charcoal */
+  --color-bg-ink-light: #26211A;
+  --color-text-ink-light:#FAF8F5;       /* Parchment color text for dark sections */
 
   /* Brand colors */
-  --color-teal:         #0d9aa8;        /* Malabar ocean teal */
-  --color-teal-light:   #14c8d8;
-  --color-teal-dark:    #0a7a85;
-  --color-saffron:      #e8a020;        /* Kerala spice saffron */
-  --color-saffron-light:#f0bc50;
-  --color-saffron-dark: #c07818;
-  --color-green:        #2d9160;        /* Cardamom green */
-  --color-green-light:  #3ab87a;
-  --color-gold:         #c9a84c;        /* Antique Malabar gold */
-  --color-gold-light:   #dfc070;
+  --color-teal:         #0E4D4A;        /* Malabar Teal (deep Arabian Sea) */
+  --color-teal-light:   #1E6E6A;        /* Readable teal link */
+  --color-teal-dark:    #062A29;
+  --color-saffron:      #B8863B;        /* Muted Kerala spice/brass */
+  --color-saffron-light:#D4A252;
+  --color-saffron-dark: #8E6023;
+  --color-green:        #5C7D64;        /* Cardamom sage green */
+  --color-green-light:  #73967C;
+  --color-gold:         #A87B3B;        /* Antique Malabar gold */
+  --color-gold-light:   #C49652;
 
-  /* Status colors */
-  --color-pending:      #e8a020;
-  --color-attested:     #3ab87a;
-  --color-active:       #14c8d8;
-  --color-settled:      #6b8fff;
-  --color-clawback:     #e85050;
+  /* Status colors — Desaturated & Harmonized */
+  --color-pending:      #B8863B;        /* Brass/Ochre */
+  --color-attested:     #5C7D64;        /* Sage green */
+  --color-active:       #0E4D4A;        /* Deep teal */
+  --color-settled:      #5E7385;        /* Slate blue */
+  --color-clawback:     #B56658;        /* Terracotta red */
 
   /* Text */
-  --color-text-primary:   #f0ece4;      /* Warm white — aged parchment */
-  --color-text-secondary: #8fa8bc;
-  --color-text-muted:     #4a6478;
-  --color-text-accent:    #14c8d8;
+  --color-text-primary:   #1A1712;      /* Near-black warm ink */
+  --color-text-secondary: #4E463C;      /* Secondary charcoal */
+  --color-text-muted:     #7E7468;      /* Muted graphite */
+  --color-text-accent:    #0E4D4A;      /* Malabar teal accent */
 
   /* Borders */
-  --color-border:       rgba(13, 154, 168, 0.18);
-  --color-border-gold:  rgba(201, 168, 76, 0.25);
-  --color-border-glow:  rgba(20, 200, 216, 0.35);
+  --color-border:       rgba(26, 23, 18, 0.12); /* Hairline low-opacity ink */
+  --color-border-gold:  rgba(184, 134, 59, 0.25);
+  --color-border-glow:  rgba(14, 77, 74, 0.18);
 
   /* Gradients */
-  --gradient-brand:     linear-gradient(135deg, #0d9aa8 0%, #2d9160 100%);
-  --gradient-saffron:   linear-gradient(135deg, #e8a020 0%, #c07818 100%);
-  --gradient-hero:      linear-gradient(160deg, #060d12 0%, #0a1520 50%, #0d1e30 100%);
-  --gradient-card:      linear-gradient(145deg, rgba(15,31,46,0.9) 0%, rgba(10,21,32,0.9) 100%);
-  --gradient-glow-teal: radial-gradient(ellipse at center, rgba(13,154,168,0.15) 0%, transparent 70%);
-  --gradient-glow-saffron: radial-gradient(ellipse at center, rgba(232,160,32,0.12) 0%, transparent 70%);
+  --gradient-brand:     linear-gradient(135deg, #0E4D4A 0%, #5C7D64 100%);
+  --gradient-saffron:   linear-gradient(135deg, #B8863B 0%, #8E6023 100%);
+  --gradient-hero:      linear-gradient(180deg, #F5F0E6 0%, #FAF8F5 100%);
+  --gradient-card:      linear-gradient(145deg, #FFFFFF 0%, #FAF8F5 100%);
+  --gradient-glow-teal: radial-gradient(ellipse at center, rgba(14,77,74,0.05) 0%, transparent 70%);
+  --gradient-glow-saffron: radial-gradient(ellipse at center, rgba(184,134,59,0.04) 0%, transparent 70%);
 
-  /* Shadows */
-  --shadow-card:        0 4px 24px rgba(0, 0, 0, 0.4), 0 1px 4px rgba(0,0,0,0.2);
-  --shadow-elevated:    0 8px 48px rgba(0, 0, 0, 0.5), 0 2px 8px rgba(13,154,168,0.1);
-  --shadow-glow-teal:   0 0 32px rgba(13, 154, 168, 0.3);
-  --shadow-glow-saffron: 0 0 32px rgba(232, 160, 32, 0.3);
-  --shadow-button:      0 4px 16px rgba(13, 154, 168, 0.35);
+  /* Shadows — premium thin borders over heavy shadows */
+  --shadow-card:        0 1px 3px rgba(26, 23, 18, 0.04);
+  --shadow-elevated:    0 4px 16px rgba(26, 23, 18, 0.06);
+  --shadow-glow-teal:   0 0 16px rgba(14, 77, 74, 0.08);
+  --shadow-glow-saffron: 0 0 16px rgba(184, 134, 59, 0.08);
+  --shadow-button:      0 1px 2px rgba(26, 23, 18, 0.05);
 
   /* Typography */
   --font-display:  'Cormorant Garamond', 'Georgia', serif;
   --font-ui:       'Inter', -apple-system, BlinkMacSystemFont, sans-serif;
 
-  /* Sizes */
-  --radius-sm:    6px;
-  --radius-md:    12px;
-  --radius-lg:    18px;
-  --radius-xl:    24px;
+  /* Sizes — Premium tight radius */
+  --radius-sm:    4px;
+  --radius-md:    6px;
+  --radius-lg:    8px;
+  --radius-xl:    12px;
   --radius-pill:  999px;
 
   /* Spacing */
@@ -84,12 +89,12 @@
   --space-9:  96px;
 
   /* Transitions */
-  --transition-fast:   150ms ease;
-  --transition-base:   250ms ease;
-  --transition-slow:   400ms ease;
+  --transition-fast:   100ms ease-out;
+  --transition-base:   200ms ease-out;
+  --transition-slow:   350ms ease-out;
 
   /* Layout */
-  --max-width: 1280px;
+  --max-width: 1200px;
   --nav-height: 72px;
 }
 
@@ -228,8 +233,6 @@ h4 { font-size: 1.125rem; font-weight: 600; }
   border-radius: var(--radius-lg);
   padding: var(--space-5);
   box-shadow: var(--shadow-card);
-  backdrop-filter: blur(12px);
-  -webkit-backdrop-filter: blur(12px);
   transition: transform var(--transition-base), box-shadow var(--transition-base),
               border-color var(--transition-base);
 }
@@ -237,24 +240,22 @@ h4 { font-size: 1.125rem; font-weight: 600; }
 .card:hover {
   transform: translateY(-2px);
   box-shadow: var(--shadow-elevated);
-  border-color: var(--color-border-glow);
+  border-color: var(--color-teal);
 }
 
 .card-gold {
   border-color: var(--color-border-gold);
-  background: linear-gradient(145deg, rgba(20,38,58,0.9) 0%, rgba(15,31,46,0.9) 100%);
+  background: linear-gradient(145deg, #FAF8F5 0%, #FFFFFF 100%);
 }
 
 .card-highlight {
-  border-color: var(--color-teal-dark);
-  box-shadow: var(--shadow-card), inset 0 0 0 1px rgba(13,154,168,0.1);
+  border-color: var(--color-teal);
+  box-shadow: var(--shadow-card), inset 0 0 0 1px rgba(14,77,74,0.05);
 }
 
-/* ── Glassmorphism Panel ─────────────────────────────────────── */
+/* ── Glassmorphism Panel (Updated to Parchment Overlay) ──────── */
 .glass-panel {
   background: var(--color-bg-glass);
-  backdrop-filter: blur(20px);
-  -webkit-backdrop-filter: blur(20px);
   border: 1px solid var(--color-border);
   border-radius: var(--radius-lg);
 }
@@ -284,44 +285,47 @@ h4 { font-size: 1.125rem; font-weight: 600; }
   content: '';
   position: absolute;
   inset: 0;
-  background: rgba(255,255,255,0);
+  background: rgba(26,23,18,0);
   transition: background var(--transition-fast);
 }
 
-.btn:hover::before { background: rgba(255,255,255,0.06); }
+.btn:hover::before { background: rgba(26,23,18,0.03); }
 .btn:active { transform: scale(0.98); }
 
 .btn-primary {
-  background: var(--gradient-brand);
-  color: #fff;
+  background: var(--color-teal);
+  color: #FAF8F5; /* parchment text */
   box-shadow: var(--shadow-button);
 }
 
 .btn-primary:hover {
-  box-shadow: var(--shadow-glow-teal);
+  background: var(--color-teal-light);
   transform: translateY(-1px);
+  box-shadow: var(--shadow-elevated);
 }
 
 .btn-saffron {
-  background: var(--gradient-saffron);
-  color: #1a0d00;
-  box-shadow: 0 4px 16px rgba(232,160,32,0.35);
+  background: var(--color-saffron);
+  color: #FAF8F5; /* parchment text */
+  box-shadow: var(--shadow-button);
 }
 
 .btn-saffron:hover {
-  box-shadow: var(--shadow-glow-saffron);
+  background: var(--color-saffron-light);
   transform: translateY(-1px);
+  box-shadow: var(--shadow-elevated);
 }
 
 .btn-outline {
   background: transparent;
-  color: var(--color-teal-light);
-  border: 1px solid var(--color-border-glow);
+  color: var(--color-teal);
+  border: 1px solid var(--color-teal);
 }
 
 .btn-outline:hover {
-  background: rgba(13, 154, 168, 0.1);
-  border-color: var(--color-teal);
+  background: rgba(14, 77, 74, 0.04);
+  border-color: var(--color-teal-light);
+  color: var(--color-teal-light);
 }
 
 .btn-ghost {
@@ -331,20 +335,20 @@ h4 { font-size: 1.125rem; font-weight: 600; }
 }
 
 .btn-ghost:hover {
-  background: rgba(255,255,255,0.04);
+  background: rgba(26, 23, 18, 0.03);
   color: var(--color-text-primary);
-  border-color: rgba(255,255,255,0.15);
+  border-color: var(--color-text-primary);
 }
 
 .btn-danger {
-  background: rgba(232,80,80,0.15);
-  color: #f08080;
-  border: 1px solid rgba(232,80,80,0.3);
+  background: rgba(181,102,88,0.1);
+  color: var(--color-clawback);
+  border: 1px solid rgba(181,102,88,0.25);
 }
 
 .btn-danger:hover {
-  background: rgba(232,80,80,0.25);
-  border-color: rgba(232,80,80,0.6);
+  background: rgba(181,102,88,0.2);
+  border-color: var(--color-clawback);
 }
 
 .btn-sm { padding: 7px 14px; font-size: 0.8rem; border-radius: var(--radius-sm); }
@@ -375,7 +379,7 @@ h4 { font-size: 1.125rem; font-weight: 600; }
 .form-input,
 .form-select,
 .form-textarea {
-  background: rgba(255,255,255,0.04);
+  background: #FFFFFF;
   border: 1px solid var(--color-border);
   border-radius: var(--radius-md);
   color: var(--color-text-primary);
@@ -391,7 +395,7 @@ h4 { font-size: 1.125rem; font-weight: 600; }
 .form-select:focus,
 .form-textarea:focus {
   border-color: var(--color-teal);
-  box-shadow: 0 0 0 3px rgba(13,154,168,0.15);
+  box-shadow: 0 0 0 3px rgba(14, 77, 74, 0.08);
 }
 
 .form-input::placeholder,
@@ -399,14 +403,14 @@ h4 { font-size: 1.125rem; font-weight: 600; }
 
 .form-select {
   appearance: none;
-  background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='12' height='8' viewBox='0 0 12 8'%3E%3Cpath d='M1 1l5 5 5-5' stroke='%238fa8bc' stroke-width='1.5' fill='none' stroke-linecap='round'/%3E%3C/svg%3E");
+  background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='12' height='8' viewBox='0 0 12 8'%3E%3Cpath d='M1 1l5 5 5-5' stroke='%234e463c' stroke-width='1.5' fill='none' stroke-linecap='round'/%3E%3C/svg%3E");
   background-repeat: no-repeat;
   background-position: right 14px center;
   padding-right: 40px;
   cursor: pointer;
 }
 
-.form-select option { background: var(--color-bg-elevated); }
+.form-select option { background: #FFFFFF; color: var(--color-text-primary); }
 
 .form-textarea { resize: vertical; min-height: 100px; }
 
@@ -417,7 +421,7 @@ h4 { font-size: 1.125rem; font-weight: 600; }
 
 .form-error {
   font-size: 0.75rem;
-  color: #f08080;
+  color: var(--color-clawback);
 }
 
 /* ── Badges / Status Pills ───────────────────────────────────── */
@@ -434,14 +438,12 @@ h4 { font-size: 1.125rem; font-weight: 600; }
   border: 1px solid transparent;
 }
 
-.badge-pending  { background: rgba(232,160,32,0.12); color: var(--color-saffron-light); border-color: rgba(232,160,32,0.25); }
-.badge-attested { background: rgba(58,184,122,0.12); color: var(--color-green-light);   border-color: rgba(58,184,122,0.25); }
-.badge-active   { background: rgba(20,200,216,0.12); color: var(--color-teal-light);    border-color: rgba(20,200,216,0.25); }
-.badge-settled  { background: rgba(107,143,255,0.12); color: #8fa8ff;                   border-color: rgba(107,143,255,0.25); }
-.badge-clawback { background: rgba(232,80,80,0.12);  color: #f08080;                    border-color: rgba(232,80,80,0.25); }
-.badge-kyc      { background: rgba(58,184,122,0.12); color: var(--color-green-light);   border-color: rgba(58,184,122,0.25); }
-
-/* ── Progress/Attestation Tracker ────────────────────────────── */
+.badge-pending  { background: rgba(184,134,59,0.08); color: var(--color-pending); border-color: rgba(184,134,59,0.2); }
+.badge-attested { background: rgba(92,125,100,0.08); color: var(--color-attested);   border-color: rgba(92,125,100,0.2); }
+.badge-active   { background: rgba(14,77,74,0.08); color: var(--color-active);    border-color: rgba(14,77,74,0.2); }
+.badge-settled  { background: rgba(94,115,133,0.08); color: var(--color-settled);                   border-color: rgba(94,115,133,0.2); }
+.badge-clawback { background: rgba(181,102,88,0.08);  color: var(--color-clawback);                    border-color: rgba(181,102,88,0.2); }
+.badge-kyc      { background: rgba(92,125,100,0.08); color: var(--color-attested);   border-color: rgba(92,125,100,0.2); }/* ── Progress/Attestation Tracker ────────────────────────────── */
 .attestation-dots {
   display: flex;
   gap: var(--space-2);
