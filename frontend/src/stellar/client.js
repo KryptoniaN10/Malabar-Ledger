@@ -17,33 +17,65 @@ export const horizonServer = new Horizon.Server(HORIZON_URL);
 // ── Freighter wallet integration ──────────────────────────────
 
 export async function connectFreighter() {
-  // @stellar/freighter-api
   if (typeof window === 'undefined') return null;
 
   try {
-    const { isConnected, getPublicKey, requestAccess } =
-      await import('@stellar/freighter-api');
+    // Check window.stellar directly (injects early on mobile app built-in browser)
+    const hasStellarWindow = !!window.stellar;
+    const { isConnected, requestAccess, getPublicKey } = await import('@stellar/freighter-api');
 
     const connected = await isConnected();
-    if (!connected.isConnected) {
-      const access = await requestAccess();
-      if (access.error) throw new Error(access.error);
+    const connectedVal = typeof connected === 'boolean' ? connected : !!(connected && connected.isConnected);
+    const isAvailable = hasStellarWindow || connectedVal;
+
+    if (!isAvailable) {
+      console.warn('[Freighter] Neither extension nor mobile app is detected.');
+      return null;
     }
 
-    const { publicKey } = await getPublicKey();
-    return publicKey;
+    // Try requestAccess (works on both extension and mobile app)
+    try {
+      const access = await requestAccess();
+      if (access && access.address) {
+        return access.address;
+      }
+      if (access && access.error) {
+        throw new Error(access.error);
+      }
+    } catch (e) {
+      console.warn('[Freighter] requestAccess failed, trying fallback:', e.message);
+    }
+
+    // Try getPublicKey (legacy returns string directly)
+    const pubKey = await getPublicKey();
+    if (typeof pubKey === 'string') return pubKey;
+    if (pubKey && pubKey.publicKey) return pubKey.publicKey;
+
+    // Direct window.stellar fallback
+    if (window.stellar && typeof window.stellar.getPublicKey === 'function') {
+      return await window.stellar.getPublicKey();
+    }
+
+    return null;
   } catch (err) {
-    // Freighter not installed — return null; UI handles this case
-    console.warn('[Freighter] Not available:', err.message);
+    console.warn('[Freighter] Error connecting:', err.message);
     return null;
   }
 }
 
 export async function getFreighterPublicKey() {
   try {
-    const { getPublicKey } = await import('@stellar/freighter-api');
-    const { publicKey } = await getPublicKey();
-    return publicKey;
+    const { getPublicKey, requestAccess } = await import('@stellar/freighter-api');
+    const pubKey = await getPublicKey();
+    if (typeof pubKey === 'string') return pubKey;
+    if (pubKey && pubKey.publicKey) return pubKey.publicKey;
+
+    if (window.stellar && typeof window.stellar.getPublicKey === 'function') {
+      return await window.stellar.getPublicKey();
+    }
+
+    const access = await requestAccess();
+    return access.address || null;
   } catch {
     return null;
   }
@@ -82,14 +114,76 @@ export async function signTransactionWithFreighter({ investorAddress, paymentUsd
 
   const txXdr = tx.toXDR();
 
-  // Ask Freighter to sign
-  const signed = await signTransaction(txXdr, {
-    networkPassphrase: NETWORK === 'mainnet' ? Networks.PUBLIC : Networks.TESTNET,
-  });
-  if (signed.error) throw new Error(signed.error);
+  // Ask Freighter to sign (with direct window.stellar fallback for mobile webview)
+  let signed;
+  try {
+    signed = await signTransaction(txXdr, {
+      networkPassphrase: NETWORK === 'mainnet' ? Networks.PUBLIC : Networks.TESTNET,
+    });
+  } catch (freighterApiErr) {
+    if (window.stellar && typeof window.stellar.signTransaction === 'function') {
+      const networkPassphrase = NETWORK === 'mainnet' ? Networks.PUBLIC : Networks.TESTNET;
+      const signedXdr = await window.stellar.signTransaction(txXdr, {
+        network: NETWORK.toUpperCase(),
+        networkPassphrase,
+      });
+      signed = { signedTxXdr: signedXdr };
+    } else {
+      throw freighterApiErr;
+    }
+  }
+
+  if (!signed || !signed.signedTxXdr) {
+    throw new Error('Signing failed: no transaction signature returned');
+  }
 
   // Submit signed transaction to Horizon
   const { TransactionBuilder: TB } = await import('@stellar/stellar-sdk');
+  const signedTx = TB.fromXDR(signed.signedTxXdr, NETWORK === 'mainnet' ? Networks.PUBLIC : Networks.TESTNET);
+  const result = await horizonServer.submitTransaction(signedTx);
+  return { hash: result.hash };
+}
+
+// ── Execute a sponsored trustline transaction ──────────────────
+// Calls the API to build a sponsored reserve trustline, signs it
+// with Freighter (beneficiary's signature), and submits it.
+export async function executeSponsoredTrustline(beneficiaryAddress, assetCode) {
+  const { signTransaction } = await import('@stellar/freighter-api');
+  const { TransactionBuilder: TB, Networks } = await import('@stellar/stellar-sdk');
+
+  const response = await stellarApi.sponsorTrustline({
+    beneficiary_address: beneficiaryAddress,
+    asset_code: assetCode,
+  });
+
+  if (!response.sponsored || !response.xdr) {
+    return false;
+  }
+
+  // Ask Freighter to sign (with direct window.stellar fallback for mobile webview)
+  let signed;
+  try {
+    signed = await signTransaction(response.xdr, {
+      networkPassphrase: NETWORK === 'mainnet' ? Networks.PUBLIC : Networks.TESTNET,
+    });
+  } catch (freighterApiErr) {
+    if (window.stellar && typeof window.stellar.signTransaction === 'function') {
+      const networkPassphrase = NETWORK === 'mainnet' ? Networks.PUBLIC : Networks.TESTNET;
+      const signedXdr = await window.stellar.signTransaction(response.xdr, {
+        network: NETWORK.toUpperCase(),
+        networkPassphrase,
+      });
+      signed = { signedTxXdr: signedXdr };
+    } else {
+      throw freighterApiErr;
+    }
+  }
+
+  if (!signed || !signed.signedTxXdr) {
+    throw new Error('Signing failed: no transaction signature returned');
+  }
+
+  // Submit to Horizon
   const signedTx = TB.fromXDR(signed.signedTxXdr, NETWORK === 'mainnet' ? Networks.PUBLIC : Networks.TESTNET);
   const result = await horizonServer.submitTransaction(signedTx);
   return { hash: result.hash };
@@ -162,8 +256,8 @@ export const receivablesApi = {
   buyShare: (id, body) =>
     apiCall(`/api/receivables/${id}/buy-share`, 'POST', body),
 
-  resetDemo: () =>
-    apiCall('/api/receivables/reset-demo', 'POST'),
+  resetDemo: (body) =>
+    apiCall('/api/receivables/reset-demo', 'POST', body),
 };
 
 // ── KYC / Auth API ────────────────────────────────────────────

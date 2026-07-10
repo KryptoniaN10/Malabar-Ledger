@@ -415,16 +415,23 @@ export default function ExporterDashboard({ walletAddress, onConnect }) {
 }
 
 function ExporterReceivableRow({ rec }) {
-  const statusColors = {
-    pending: 'var(--color-saffron)',
-    attested: 'var(--color-green-light)',
-    active: 'var(--color-teal-light)',
-    settled: '#8fa8ff',
-    clawback: '#f08080',
+  const LIFECYCLE = ['pending', 'attested', 'active', 'settled'];
+  const normalizedStatus = rec.status === 'settled_pending' ? 'active' : rec.status;
+  const stageIdx = LIFECYCLE.indexOf(normalizedStatus);
+  const pct = stageIdx < 0 ? 0 : Math.round(((stageIdx + 1) / LIFECYCLE.length) * 100);
+
+  const statusLabel = {
+    pending: 'Pending Attestation',
+    attested: 'Attested — Ready to List',
+    active: 'Active — For Sale',
+    settled_pending: 'Payout Ready',
+    settled: 'Settled',
+    clawback: 'Clawback',
   };
 
   return (
     <div className="card" style={{ padding: 'var(--space-4)' }}>
+      {/* Header */}
       <div className="flex items-center justify-between" style={{ marginBottom: 'var(--space-3)' }}>
         <div>
           <div className="text-ui-sm" style={{ fontWeight: 700 }}>
@@ -432,38 +439,59 @@ function ExporterReceivableRow({ rec }) {
           </div>
           <div className="text-ui-xs text-muted">#{rec.id} · {rec.buyer_country}</div>
         </div>
-        <div>
+        <div style={{ textAlign: 'right' }}>
           <span className="text-ui-lg" style={{ fontWeight: 700, color: 'var(--color-teal-light)' }}>
             {formatUsd(rec.amount_usd * 100)}
           </span>
+          <div className="text-ui-xs text-muted">Due {rec.maturity_date}</div>
         </div>
       </div>
 
+      {/* Attestation progress */}
       <AttestationMini count={rec.attestation_count || 0} required={2} />
 
+      {/* Token asset code with Stellar Expert link */}
       {rec.token_asset_code && (
-        <div className="text-ui-xs text-accent monospace" style={{ marginTop: 'var(--space-2)' }}>
-          Token: {rec.token_asset_code}
+        <div className="flex items-center gap-2" style={{ marginTop: 'var(--space-2)' }}>
+          <span className="badge badge-attested" style={{ fontSize: '0.6rem' }}>{rec.token_asset_code}</span>
+          {rec.issuer_public_key && !rec.issuer_public_key.startsWith('demo') ? (
+            <a
+              href={`https://stellar.expert/explorer/testnet/asset/${rec.token_asset_code}-${rec.issuer_public_key}`}
+              target="_blank"
+              rel="noopener noreferrer"
+              className="text-ui-xs"
+              style={{ color: 'var(--color-teal-light)', textDecoration: 'underline' }}
+            >
+              View on Stellar ↗
+            </a>
+          ) : (
+            <span className="text-ui-xs text-muted">(local demo)</span>
+          )}
         </div>
       )}
 
-      <div style={{
-        height: 2, background: 'var(--color-border)', borderRadius: 1,
-        marginTop: 'var(--space-3)', overflow: 'hidden',
-      }}>
+      {/* Lifecycle progress bar */}
+      <div style={{ height: 4, background: 'var(--color-border)', borderRadius: 2, marginTop: 'var(--space-3)', overflow: 'hidden' }}>
         <div style={{
           height: '100%',
-          background: statusColors[rec.status] || 'var(--color-border)',
-          width: rec.status === 'settled' ? '100%'
-            : rec.status === 'active' ? '75%'
-            : rec.status === 'attested' ? '50%'
-            : rec.attestation_count >= 1 ? '25%' : '0%',
+          background: rec.status === 'clawback'
+            ? '#f08080'
+            : 'linear-gradient(90deg, var(--color-teal), var(--color-teal-light))',
+          width: `${pct}%`,
           transition: 'width 0.8s ease',
         }} />
       </div>
 
-      <div className="text-ui-xs text-muted" style={{ marginTop: 'var(--space-2)', textTransform: 'capitalize' }}>
-        Status: {rec.status} · Due {rec.maturity_date}
+      {/* Status + doc hash */}
+      <div className="flex items-center justify-between" style={{ marginTop: 'var(--space-2)' }}>
+        <div className="text-ui-xs" style={{ color: rec.status === 'clawback' ? '#f08080' : 'var(--color-text-muted)' }}>
+          {statusLabel[rec.status] || rec.status}
+        </div>
+        {rec.doc_hash && (
+          <div className="monospace text-ui-xs text-muted" title={rec.doc_hash}>
+            {rec.doc_hash.slice(0, 8)}…
+          </div>
+        )}
       </div>
     </div>
   );

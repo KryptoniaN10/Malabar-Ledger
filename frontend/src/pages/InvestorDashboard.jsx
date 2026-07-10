@@ -398,7 +398,7 @@ function PortfolioPosition({ investment, walletAddress, onDexSuccess }) {
             </span>
           </div>
           <div className="text-ui-xs text-muted" style={{ marginTop: 2, marginLeft: 16 }}>
-            {receivable?.buyer_country} · {days !== null ? `${days}d to maturity` : 'matured'}
+            {receivable?.buyer_name} · {receivable?.buyer_country} · {days !== null ? `${days}d to maturity` : 'matured'}
           </div>
         </div>
         <div style={{ textAlign: 'right' }}>
@@ -434,6 +434,25 @@ function PortfolioPosition({ investment, walletAddress, onDexSuccess }) {
           walletAddress={walletAddress}
           onSuccess={onDexSuccess}
         />
+      )}
+
+      {/* Token link */}
+      {receivable?.token_asset_code && (
+        <div style={{ marginTop: 4 }}>
+          {receivable.issuer_public_key && !receivable.issuer_public_key.startsWith('demo') ? (
+            <a
+              href={`https://stellar.expert/explorer/testnet/asset/${receivable.token_asset_code}-${receivable.issuer_public_key}`}
+              target="_blank"
+              rel="noopener noreferrer"
+              className="text-ui-xs"
+              style={{ color: 'var(--color-teal-light)', textDecoration: 'underline', opacity: 0.8 }}
+            >
+              {receivable.token_asset_code} on Stellar Expert ↗
+            </a>
+          ) : (
+            <span className="text-ui-xs text-muted">{receivable.token_asset_code} (local demo)</span>
+          )}
+        </div>
       )}
 
       {receivable?.status === 'settled' && (

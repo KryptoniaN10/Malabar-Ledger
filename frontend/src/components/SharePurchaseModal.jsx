@@ -1,6 +1,6 @@
 import React, { useState } from 'react';
 import { receivablesApi, formatUsd, formatYield, daysUntil } from '../stellar/client.js';
-import { signTransactionWithFreighter } from '../stellar/client.js';
+import { signTransactionWithFreighter, executeSponsoredTrustline } from '../stellar/client.js';
 
 // ── Share Purchase Modal ───────────────────────────────────────
 // Investor selects how much of a receivable to buy.
@@ -28,6 +28,16 @@ export default function SharePurchaseModal({ receivable, investorAddress, onClos
     setError(null);
     try {
       let txHash = null;
+
+      // ── Step 0: Ensure trustline for receivable token exists ──
+      // If we are on testnet and have a token_asset_code, check if we need to sponsor it
+      if (receivable.token_asset_code) {
+        try {
+          await executeSponsoredTrustline(investorAddress, receivable.token_asset_code);
+        } catch (trustlineErr) {
+          console.warn('[SharePurchase] Trustline sponsorship skipped or failed (demo mode ok):', trustlineErr.message);
+        }
+      }
 
       // ── Step 1: Sign USDC payment with Freighter ──────────────
       // We attempt to sign an XDR representing the USDC payment.

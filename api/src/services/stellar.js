@@ -138,20 +138,18 @@ export async function authorizeInvestorTrustline(investorPublicKey, asset) {
 // ── Sponsored Reserves ───────────────────────────────────────
 
 /**
- * Create a sponsored trustline for a new user so they don't need XLM
+ * Create a sponsored trustline transaction for a user so they don't need XLM
  * to participate. The project's issuer account sponsors the reserve.
+ * Returns the half-signed transaction XDR for the user to sign and submit.
  *
  * @param {string} beneficiaryPublicKey  exporter or investor being onboarded
- * @param {Asset}  asset                 the asset to create a trustline for
- * @param {Keypair} beneficiaryKp        must sign to accept sponsorship
+ * @param {string} assetCode             the receivable asset code (e.g. "ML0001")
+ * @returns {string} base64 transaction XDR
  */
-export async function createSponsoredTrustline(
-  beneficiaryPublicKey,
-  asset,
-  beneficiaryKp
-) {
+export async function createSponsoredTrustline(beneficiaryPublicKey, assetCode) {
   const issuerKp = getIssuerKeypair();
   const issuerAccount = await loadAccount(issuerKp.publicKey());
+  const asset = new Asset(assetCode, issuerKp.publicKey());
 
   const tx = new TransactionBuilder(issuerAccount, {
     fee: BASE_FEE,
@@ -176,15 +174,12 @@ export async function createSponsoredTrustline(
         source: beneficiaryPublicKey,
       })
     )
-    .setTimeout(30)
+    .setTimeout(180)
     .build();
 
-  // Both issuer and beneficiary must sign
+  // Sponsor signs first
   tx.sign(issuerKp);
-  tx.sign(beneficiaryKp);
-
-  const result = await horizonServer.submitTransaction(tx);
-  return result.hash;
+  return tx.toXDR();
 }
 
 // ── DEX ──────────────────────────────────────────────────────

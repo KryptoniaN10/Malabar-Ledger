@@ -55,7 +55,12 @@ router.get('/', (req, res) => {
     const investments = db
       .prepare('SELECT * FROM investments WHERE receivable_id = ?')
       .all(r.id);
-    return { ...r, attestations, investments };
+    return {
+      ...r,
+      attestations,
+      investments,
+      issuer_public_key: process.env.ISSUER_PUBLIC_KEY || 'demo',
+    };
   });
 
   res.json(withAttestations);
@@ -81,7 +86,13 @@ router.get('/:id', (req, res) => {
     .prepare('SELECT * FROM oracle_events WHERE receivable_id = ? ORDER BY occurred_at DESC')
     .all(rec.id);
 
-  res.json({ ...rec, attestations, investments, events });
+  res.json({
+    ...rec,
+    attestations,
+    investments,
+    events,
+    issuer_public_key: process.env.ISSUER_PUBLIC_KEY || 'demo',
+  });
 });
 
 // ── Register a new receivable ─────────────────────────────────
@@ -232,9 +243,9 @@ router.post('/:id/attest', async (req, res, next) => {
       // Mint: issue 1 token to the exporter (face value = 1 unit)
       // In production: issue face_value_cents / 100 units at $1 each
       let mintTxHash = null;
-      const issuerKp = getIssuerKp();
-      if (issuerKp) {
+      if (process.env.ISSUER_SECRET_KEY) {
         try {
+          const issuerKp = Keypair.fromSecret(process.env.ISSUER_SECRET_KEY);
           const issuerAccount = await horizonServer.loadAccount(issuerKp.publicKey());
           const receivableAsset = new Asset(assetCode, issuerKp.publicKey());
 
@@ -443,17 +454,26 @@ router.post('/:id/buy-share', async (req, res, next) => {
 
 // ── Demo reset ────────────────────────────────────────────────
 // POST /api/receivables/reset-demo
-// Clears all receivables, investments, attestations, and oracle events,
-// then re-seeds 5 demo receivables. Safe to call repeatedly.
+// Clears all receivables, investments, attestations, and oracle events.
+// If body contains { clear_only: true }, it skips seeding new demo data.
 router.post('/reset-demo', async (req, res, next) => {
   try {
     const db = getDb();
+    const { clear_only } = req.body || {};
 
     // Clear all derived data first (FK order)
     db.prepare('DELETE FROM oracle_events').run();
     db.prepare('DELETE FROM investments').run();
     db.prepare('DELETE FROM attestations').run();
     db.prepare('DELETE FROM receivables').run();
+
+    if (clear_only) {
+      return res.json({
+        success: true,
+        receivables_created: 0,
+        message: 'Database cleared successfully. All receivables and metadata removed.',
+      });
+    }
 
     // Dynamic import to avoid circular deps
     const { seedDemo } = await import('../seed-demo.js');

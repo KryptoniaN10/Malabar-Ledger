@@ -23,8 +23,8 @@ export default function AdminPanel({ walletAddress }) {
   const [actionResults, setActionResults] = useState({});
   const [resetting, setResetting] = useState(false);
 
-  const load = useCallback(async () => {
-    setLoading(true);
+  const load = useCallback(async (showSkeletons = false) => {
+    if (showSkeletons) setLoading(true);
     const [recs, sessions, events] = await Promise.all([
       receivablesApi.list().catch(() => []),
       authApi.listSessions().catch(() => []),
@@ -36,10 +36,14 @@ export default function AdminPanel({ walletAddress }) {
     setLoading(false);
   }, []);
 
-  useEffect(() => { load(); }, [load]);
-  // Auto-refresh every 8s
+  // Initial load showing skeletons
   useEffect(() => {
-    const interval = setInterval(load, 8000);
+    load(true);
+  }, [load]);
+
+  // Silent auto-refresh every 8s (no skeletons to prevent flicker)
+  useEffect(() => {
+    const interval = setInterval(() => load(false), 8000);
     return () => clearInterval(interval);
   }, [load]);
 
@@ -48,9 +52,21 @@ export default function AdminPanel({ walletAddress }) {
     setResetting(true);
     try {
       await receivablesApi.resetDemo();
-      await load();
+      await load(true);
     } catch (err) {
       alert(`Reset failed: ${err.message}`);
+    }
+    setResetting(false);
+  }
+
+  async function handleClearAll() {
+    if (!window.confirm('Wipe all database records? This will delete all receivables, KYC sessions, investments, and oracle logs, leaving the application completely empty.')) return;
+    setResetting(true);
+    try {
+      await receivablesApi.resetDemo({ clear_only: true });
+      await load(true);
+    } catch (err) {
+      alert(`Clear failed: ${err.message}`);
     }
     setResetting(false);
   }
@@ -103,6 +119,15 @@ export default function AdminPanel({ walletAddress }) {
             >
               {resetting ? '⏳ Resetting...' : '🔄 Reset Demo Data'}
             </button>
+            <button
+              className="btn btn-ghost btn-sm"
+              onClick={handleClearAll}
+              disabled={resetting}
+              id="admin-clear-all-btn"
+              style={{ borderColor: '#f08080', color: '#f08080' }}
+            >
+              {resetting ? '⏳ Clearing...' : '🗑️ Clear All Data'}
+            </button>
           </div>
         </div>
 
@@ -134,7 +159,7 @@ export default function AdminPanel({ walletAddress }) {
             </button>
           ))}
           <div style={{ flex: 1 }} />
-          <button className="btn btn-ghost btn-sm" onClick={load} id="admin-refresh-btn">
+          <button className="btn btn-ghost btn-sm" onClick={() => load(false)} id="admin-refresh-btn">
             ↻ Refresh
           </button>
         </div>
@@ -516,6 +541,7 @@ function AdminReceivableRow({
 function ActionFeedback({ result }) {
   if (!result) return null;
   const url = result.data?.stellar_expert_url;
+  const isAlreadyAttestedError = !result.ok && result.error === 'Already attested';
   return (
     <div className={`alert ${result.ok ? 'alert-success' : 'alert-error'} animate-fade-in`}
       style={{ padding: '8px 12px' }}>
@@ -523,6 +549,11 @@ function ActionFeedback({ result }) {
         <div className="text-ui-xs">
           {result.ok ? `✓ ${result.data?.message || 'Success'}` : `✗ ${result.error}`}
         </div>
+        {isAlreadyAttestedError && (
+          <div className="text-ui-xs text-muted" style={{ marginTop: 6, lineHeight: 1.4, color: 'var(--color-saffron)' }}>
+            💡 <strong>Anti-Collusion Security Rule:</strong> A single Stellar wallet address cannot sign for multiple attestation roles on the same receivable. To sign as another role for the demo, click the <strong>⏏</strong> (disconnect) button in the top-right navbar to use fallback demo addresses, or switch accounts in Freighter.
+          </div>
+        )}
         {url && (
           <a
             href={url}

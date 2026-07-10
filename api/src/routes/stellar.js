@@ -144,17 +144,16 @@ router.post('/sponsor-trustline', async (req, res, next) => {
       });
     }
 
-    const result = await createSponsoredTrustline(
+    const xdr = await createSponsoredTrustline(
       beneficiary_address,
-      asset_code,
-      process.env.ISSUER_PUBLIC_KEY
+      asset_code
     );
 
     res.json({
       success: true,
       sponsored: true,
-      tx_hash: result.hash,
-      message: `Trustline reserve sponsored. ${beneficiary_address} can now hold ${asset_code} with zero XLM.`,
+      xdr,
+      message: `Sponsorship transaction built. Beneficiary must sign XDR via wallet.`,
     });
   } catch (err) {
     next(err);
