@@ -1,4 +1,5 @@
 import React, { useState, useEffect } from 'react';
+import { Link } from 'react-router-dom';
 import { useReceivables } from '../hooks/useReceivables.js';
 import { receivablesApi, authApi, formatUsd, daysUntil, formatYield } from '../stellar/client.js';
 import StatCard from '../components/StatCard.jsx';

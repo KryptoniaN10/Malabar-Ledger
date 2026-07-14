@@ -14,6 +14,12 @@ const API_URL = import.meta.env.VITE_API_URL || 'http://localhost:3001';
 
 export const horizonServer = new Horizon.Server(HORIZON_URL);
 
+// Stellar Expert deep-link base (switches mainnet/testnet automatically)
+export const HORIZON_EXPLORER_URL =
+  NETWORK === 'mainnet'
+    ? 'https://stellar.expert/explorer/public'
+    : 'https://stellar.expert/explorer/testnet';
+
 // ── Freighter wallet integration ──────────────────────────────
 
 export async function connectFreighter() {
@@ -209,6 +215,20 @@ export async function getTransactions(publicKey, limit = 10) {
       .order('desc')
       .call();
     return txs.records;
+  } catch {
+    return [];
+  }
+}
+
+export async function getPayments(publicKey, limit = 15) {
+  try {
+    const ops = await horizonServer
+      .payments()
+      .forAccount(publicKey)
+      .limit(limit)
+      .order('desc')
+      .call();
+    return ops.records;
   } catch {
     return [];
   }
