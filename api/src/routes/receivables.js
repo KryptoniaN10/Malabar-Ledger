@@ -361,6 +361,67 @@ router.post('/:id/list-sale', async (req, res, next) => {
   }
 });
 
+// ── Update discount rate on an active sale ────────────────────
+router.patch('/:id/discount', async (req, res, next) => {
+  try {
+    const db = getDb();
+    const { discount_bps, exporter_address } = req.body;
+    const receivableId = parseInt(req.params.id);
+
+    if (!exporter_address) {
+      return res.status(400).json({ error: 'exporter_address required' });
+    }
+
+    const rec = db.prepare('SELECT * FROM receivables WHERE id = ?').get(receivableId);
+    if (!rec) return res.status(404).json({ error: 'Not found' });
+    if (rec.status !== 'active') {
+      return res.status(400).json({ error: 'Sale is not open — discount cannot be changed' });
+    }
+
+    const bps = parseInt(discount_bps);
+    if (!bps || bps < 1) {
+      return res.status(400).json({ error: 'discount_bps must be at least 1' });
+    }
+    if (bps > 2000) {
+      return res.status(400).json({ error: 'discount_bps cannot exceed 2000 (20%)' });
+    }
+
+    const salePrice = rec.amount_usd * (1 - bps / 10000);
+
+    db.prepare(
+      'UPDATE receivables SET discount_bps = ?, updated_at = CURRENT_TIMESTAMP WHERE id = ?'
+    ).run(bps, receivableId);
+
+    // ── On-chain: FractionalSale.update_discount() ────────────
+    let txHash = null;
+    try {
+      const result = await invokeContract(
+        process.env.FRACTIONAL_SALE_CONTRACT_ID,
+        'update_discount',
+        [
+          scAddress(exporter_address),
+          scU128(receivableId),
+          scU32(bps),
+        ],
+        process.env.ISSUER_SECRET_KEY
+      );
+      txHash = result.txHash;
+    } catch (chainErr) {
+      console.warn('[update-discount] On-chain call failed (demo ok):', chainErr.message);
+    }
+
+    res.json({
+      receivable_id: receivableId,
+      discount_bps: bps,
+      sale_price_usd: salePrice,
+      tx: txHash,
+      message: `Discount updated to ${(bps / 100).toFixed(2)}%`,
+    });
+  } catch (err) {
+    next(err);
+  }
+});
+
 // ── Buy a fractional share ────────────────────────────────────
 router.post('/:id/buy-share', async (req, res, next) => {
   try {

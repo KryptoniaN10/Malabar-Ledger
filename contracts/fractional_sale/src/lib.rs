@@ -245,6 +245,67 @@ impl FractionalSale {
             .set(&DataKey::Sale(receivable_id), &listing);
     }
 
+    // ── Exporter: Update discount while sale is Open ─────────
+
+    /// Called by the exporter (or admin) to adjust the discount rate
+    /// while the sale is still open. Investors who have already bought
+    /// shares are NOT retroactively affected; only future purchases use
+    /// the new rate.
+    ///
+    /// `new_discount_bps` — new discount in basis points (1 to 2000).
+    pub fn update_discount(
+        env: Env,
+        exporter: Address,
+        receivable_id: u128,
+        new_discount_bps: u32,
+    ) {
+        exporter.require_auth();
+
+        let mut listing: SaleListing = env
+            .storage()
+            .persistent()
+            .get(&DataKey::Sale(receivable_id))
+            .expect("sale not found");
+
+        if listing.status != SaleStatus::Open {
+            panic!("sale not open");
+        }
+
+        // Only the original exporter or the admin may change the rate
+        let admin: Address = env
+            .storage()
+            .instance()
+            .get(&DataKey::Admin)
+            .expect("not initialized");
+        if exporter != listing.exporter && exporter != admin {
+            panic!("unauthorized");
+        }
+
+        if new_discount_bps == 0 {
+            panic!("discount must be at least 1 bps");
+        }
+        if new_discount_bps > 2000 {
+            panic!("discount too high");
+        }
+
+        listing.discount_bps = new_discount_bps;
+        // Recalculate the effective sale price for the remaining capacity
+        listing.sale_price_cents = listing.face_value_cents
+            - (listing.face_value_cents * new_discount_bps as i128 / 10_000);
+
+        env.storage()
+            .persistent()
+            .set(&DataKey::Sale(receivable_id), &listing);
+        env.storage()
+            .persistent()
+            .extend_ttl(&DataKey::Sale(receivable_id), 17280, 17280);
+
+        env.events().publish(
+            (symbol_short!("DISCUPD"), symbol_short!("sale")),
+            (receivable_id, new_discount_bps),
+        );
+    }
+
     fn close_sale_internal(env: &Env, listing: &mut SaleListing) {
         // Calculate total stablecoin collected
         // = sum of (share_i * (1 - discount_bps/10000)) over all investors
@@ -381,5 +442,102 @@ mod tests {
 
         let sale = client.get_sale(&0u128);
         assert_eq!(sale.status, SaleStatus::Closed);
+    }
+
+    #[test]
+    fn test_update_discount_happy_path() {
+        let env = Env::default();
+        env.mock_all_auths();
+
+        let admin = Address::generate(&env);
+        let exporter = Address::generate(&env);
+
+        let sale_id = env.register_contract(None, FractionalSale);
+        let client = FractionalSaleClient::new(&env, &sale_id);
+        client.initialize(&admin);
+
+        let (usdc_addr, _) = create_token(&env, &admin);
+
+        // List at 5% discount
+        client.list_for_sale(
+            &exporter,
+            &0u128,
+            &100_000_00i128,
+            &500u32,  // 5%
+            &1_000_00i128,
+            &0i128,
+            &usdc_addr,
+        );
+
+        // Exporter raises to 8%
+        client.update_discount(&exporter, &0u128, &800u32);
+
+        let sale = client.get_sale(&0u128);
+        assert_eq!(sale.discount_bps, 800);
+        // face_value=10_000_000 cents, 8% off = 9_200_000 cents
+        assert_eq!(sale.sale_price_cents, 100_000_00 - (100_000_00 * 800 / 10_000));
+    }
+
+    #[test]
+    #[should_panic(expected = "sale not open")]
+    fn test_update_discount_after_close_panics() {
+        let env = Env::default();
+        env.mock_all_auths();
+
+        let admin = Address::generate(&env);
+        let exporter = Address::generate(&env);
+        let investor = Address::generate(&env);
+
+        let sale_id = env.register_contract(None, FractionalSale);
+        let client = FractionalSaleClient::new(&env, &sale_id);
+        client.initialize(&admin);
+
+        let (usdc_addr, usdc_admin) = create_token(&env, &admin);
+        usdc_admin.mint(&investor, &200_000_00);
+
+        client.list_for_sale(
+            &exporter,
+            &0u128,
+            &100_000_00i128,
+            &500u32,
+            &100_00i128,
+            &0i128,
+            &usdc_addr,
+        );
+
+        // Buy full face value → auto-close
+        client.buy_share(&investor, &0u128, &100_000_00i128);
+
+        // Should panic: sale is now Closed
+        client.update_discount(&exporter, &0u128, &700u32);
+    }
+
+    #[test]
+    #[should_panic(expected = "discount too high")]
+    fn test_update_discount_cap_enforced() {
+        let env = Env::default();
+        env.mock_all_auths();
+
+        let admin = Address::generate(&env);
+        let exporter = Address::generate(&env);
+
+        let sale_id = env.register_contract(None, FractionalSale);
+        let client = FractionalSaleClient::new(&env, &sale_id);
+        client.initialize(&admin);
+
+        let (usdc_addr, _) = create_token(&env, &admin);
+
+        client.list_for_sale(
+            &exporter,
+            &0u128,
+            &100_000_00i128,
+            &500u32,
+            &100_00i128,
+            &0i128,
+            &usdc_addr,
+        );
+
+        // 25% — over the 20% cap
+        client.update_discount(&exporter, &0u128, &2500u32);
     }
 }

@@ -276,6 +276,9 @@ export const receivablesApi = {
   buyShare: (id, body) =>
     apiCall(`/api/receivables/${id}/buy-share`, 'POST', body),
 
+  updateDiscount: (id, body) =>
+    apiCall(`/api/receivables/${id}/discount`, 'PATCH', body),
+
   resetDemo: (body) =>
     apiCall('/api/receivables/reset-demo', 'POST', body),
 };

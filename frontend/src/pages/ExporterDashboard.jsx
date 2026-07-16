@@ -2,7 +2,8 @@ import React, { useState, useEffect } from 'react';
 import DocumentUpload from '../components/DocumentUpload.jsx';
 import { AttestationMini, StatusBadge } from '../components/ReceivableCard.jsx';
 import { useReceivables } from '../hooks/useReceivables.js';
-import { receivablesApi, formatUsd, daysUntil } from '../stellar/client.js';
+import { receivablesApi, formatUsd, formatYield, daysUntil } from '../stellar/client.js';
+
 
 
 const COMMODITIES = [
@@ -403,7 +404,7 @@ export default function ExporterDashboard({ walletAddress, onConnect }) {
             ) : (
               <div className="flex flex-col gap-4">
                 {myReceivables.map((rec) => (
-                  <ExporterReceivableRow key={rec.id} rec={rec} />
+                  <ExporterReceivableRow key={rec.id} rec={rec} walletAddress={walletAddress} />
                 ))}
               </div>
             )}
@@ -414,7 +415,7 @@ export default function ExporterDashboard({ walletAddress, onConnect }) {
   );
 }
 
-function ExporterReceivableRow({ rec }) {
+function ExporterReceivableRow({ rec, walletAddress }) {
   const LIFECYCLE = ['pending', 'attested', 'active', 'settled'];
   const normalizedStatus = rec.status === 'settled_pending' ? 'active' : rec.status;
   const stageIdx = LIFECYCLE.indexOf(normalizedStatus);
@@ -428,6 +429,38 @@ function ExporterReceivableRow({ rec }) {
     settled: 'Settled',
     clawback: 'Clawback',
   };
+
+  // ── Discount adjustment state ─────────────────────────────────
+  const [discountBps, setDiscountBps] = useState(rec.discount_bps || 500);
+  const [discountUpdating, setDiscountUpdating] = useState(false);
+  const [discountToast, setDiscountToast] = useState(null); // null | 'success' | 'error'
+  const [discountError, setDiscountError] = useState(null);
+
+  const days = daysUntil(rec.maturity_date);
+  const { discount: previewDiscount, apy: previewApy } = formatYield(discountBps, days);
+  const previewPriceUsd = rec.amount_usd * (1 - discountBps / 10000);
+
+  async function handleUpdateDiscount() {
+    if (!walletAddress) {
+      setDiscountError('Connect your wallet to update the discount.');
+      return;
+    }
+    setDiscountUpdating(true);
+    setDiscountError(null);
+    setDiscountToast(null);
+    try {
+      await receivablesApi.updateDiscount(rec.id, {
+        discount_bps: discountBps,
+        exporter_address: walletAddress,
+      });
+      setDiscountToast('success');
+      setTimeout(() => setDiscountToast(null), 3500);
+    } catch (err) {
+      setDiscountError(err.message);
+      setDiscountToast('error');
+    }
+    setDiscountUpdating(false);
+  }
 
   return (
     <div className="card" style={{ padding: 'var(--space-4)' }}>
@@ -493,6 +526,110 @@ function ExporterReceivableRow({ rec }) {
           </div>
         )}
       </div>
+
+      {/* ── Adjust Discount Panel (only when sale is Active / Open) ── */}
+      {rec.status === 'active' && (
+        <div style={{
+          marginTop: 'var(--space-4)',
+          padding: 'var(--space-4)',
+          background: 'rgba(255,255,255,0.03)',
+          border: '1px solid rgba(255,193,7,0.25)',
+          borderRadius: 'var(--radius-md)',
+        }}>
+          <div className="flex items-center justify-between" style={{ marginBottom: 'var(--space-3)' }}>
+            <span className="text-ui-sm" style={{ fontWeight: 600, color: 'var(--color-saffron)' }}>
+              🎚 Adjust Discount Rate
+            </span>
+            <span className="text-ui-xs text-muted">Attract more investors by increasing the yield</span>
+          </div>
+
+          {/* Slider */}
+          <div style={{ marginBottom: 'var(--space-3)' }}>
+            <div className="flex items-center justify-between" style={{ marginBottom: 6 }}>
+              <span className="text-ui-xs text-muted">Discount</span>
+              <span style={{ fontWeight: 700, color: 'var(--color-saffron)', fontSize: '1rem' }}>
+                {(discountBps / 100).toFixed(1)}%
+              </span>
+            </div>
+            <input
+              type="range"
+              min={50}   /* 0.5% min */
+              max={2000} /* 20% max */
+              step={50}
+              value={discountBps}
+              onChange={(e) => setDiscountBps(Number(e.target.value))}
+              id={`discount-slider-exporter-${rec.id}`}
+              style={{ width: '100%', accentColor: 'var(--color-saffron)' }}
+            />
+            <div className="flex items-center justify-between">
+              <span className="text-ui-xs text-muted">0.5%</span>
+              <span className="text-ui-xs text-muted">20%</span>
+            </div>
+          </div>
+
+          {/* Live preview */}
+          <div style={{
+            display: 'grid',
+            gridTemplateColumns: '1fr 1fr 1fr',
+            gap: 8,
+            marginBottom: 'var(--space-3)',
+            padding: '10px 12px',
+            background: 'rgba(0,0,0,0.2)',
+            borderRadius: 'var(--radius-sm)',
+          }}>
+            <div style={{ textAlign: 'center' }}>
+              <div className="text-ui-xs text-muted">Face Value</div>
+              <div style={{ fontWeight: 600, fontSize: '0.8rem' }}>{formatUsd(rec.amount_usd * 100)}</div>
+            </div>
+            <div style={{ textAlign: 'center' }}>
+              <div className="text-ui-xs text-muted">Investor Pays</div>
+              <div style={{ fontWeight: 700, fontSize: '0.8rem', color: 'var(--color-teal-light)' }}>
+                {formatUsd(previewPriceUsd * 100)}
+              </div>
+            </div>
+            <div style={{ textAlign: 'center' }}>
+              <div className="text-ui-xs text-muted">APY</div>
+              <div style={{ fontWeight: 700, fontSize: '0.8rem', color: 'var(--color-saffron)' }}>
+                {previewApy || previewDiscount}
+              </div>
+            </div>
+          </div>
+
+          {/* Success / error toast */}
+          {discountToast === 'success' && (
+            <div style={{
+              padding: '8px 12px',
+              borderRadius: 'var(--radius-sm)',
+              background: 'rgba(0,201,167,0.12)',
+              border: '1px solid rgba(0,201,167,0.35)',
+              color: 'var(--color-teal-light)',
+              fontSize: '0.78rem',
+              marginBottom: 'var(--space-3)',
+              animation: 'fadeIn 0.3s ease',
+            }}>
+              ✅ Discount updated to {(discountBps / 100).toFixed(1)}% — investors will see the new rate immediately.
+            </div>
+          )}
+          {discountError && (
+            <div className="alert alert-error" style={{ marginBottom: 'var(--space-3)', padding: '8px 12px', fontSize: '0.78rem' }}>
+              {discountError}
+            </div>
+          )}
+
+          <button
+            className="btn btn-outline btn-sm"
+            style={{ width: '100%', borderColor: 'var(--color-saffron)', color: 'var(--color-saffron)' }}
+            onClick={handleUpdateDiscount}
+            disabled={discountUpdating || discountBps === (rec.discount_bps || 500)}
+            id={`update-discount-btn-${rec.id}`}
+          >
+            {discountUpdating
+              ? <><div className="spinner" style={{ width: 13, height: 13 }} /> Updating…</>
+              : `🎯 Set Discount to ${(discountBps / 100).toFixed(1)}%`
+            }
+          </button>
+        </div>
+      )}
     </div>
   );
 }
