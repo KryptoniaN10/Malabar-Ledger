@@ -4,6 +4,9 @@
   "description": "Off-chain verification service for Aletheia",
   "type": "module",
   "main": "src/server.js",
+  "engines": {
+    "node": ">=20"
+  },
   "scripts": {
     "dev": "nodemon src/server.js",
     "start": "node src/server.js",
