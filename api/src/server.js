@@ -71,8 +71,8 @@ app.use((err, _req, res, _next) => {
 
 // ── Start ─────────────────────────────────────────────────────
 initDb().then(() => {
-  app.listen(PORT, () => {
-    console.log(`\n⚖️ Aletheia API running on http://localhost:${PORT}`);
+  app.listen(PORT, '0.0.0.0', () => {
+    console.log(`\n⚖️ Aletheia API running on http://0.0.0.0:${PORT}`);
     console.log(`   Network: ${process.env.STELLAR_NETWORK || 'testnet'}`);
     console.log(`   Horizon: ${process.env.STELLAR_HORIZON_URL}\n`);
   });
