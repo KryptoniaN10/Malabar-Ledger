@@ -4,10 +4,14 @@
 
 import Database from 'better-sqlite3';
 import path from 'path';
+import fs from 'fs';
 import { fileURLToPath } from 'url';
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
 const DB_PATH = process.env.DATABASE_URL || path.join(__dirname, '../../../aletheia.db');
+
+// Ensure the directory for the DB file exists (important for Railway volumes)
+fs.mkdirSync(path.dirname(path.resolve(DB_PATH)), { recursive: true });
 
 let db;
 
