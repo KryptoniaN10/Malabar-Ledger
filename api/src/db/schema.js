@@ -115,5 +115,21 @@ export async function initDb() {
     );
   `);
 
+  // ── Auto-seed on cold start ───────────────────────────────────
+  // If the receivables table is empty (fresh DB / after redeploy),
+  // populate it with demo data so the app works out of the box.
+  const count = db.prepare('SELECT COUNT(*) as c FROM receivables').get().c;
+  if (count === 0) {
+    console.log('[DB] Empty database detected — seeding demo data...');
+    try {
+      const { seedDemo } = await import('../seed-demo.js');
+      seedDemo(db);
+      const seeded = db.prepare('SELECT COUNT(*) as c FROM receivables').get().c;
+      console.log(`[DB] Demo seed complete — ${seeded} receivables inserted.`);
+    } catch (seedErr) {
+      console.warn('[DB] Auto-seed failed (non-fatal):', seedErr.message);
+    }
+  }
+
   console.log('[DB] Schema initialized at', DB_PATH);
 }
