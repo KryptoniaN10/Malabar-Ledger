@@ -2,10 +2,10 @@
 nixPkgs = ["python3", "gcc", "gnumake", "nodejs_20"]
 
 [phases.install]
-cmds = ["npm install --include=optional --prefix api"]
+cmds = ["cd api && npm install --include=optional"]
 
 [phases.build]
 cmds = []
 
 [start]
-cmd = "node api/src/server.js"
+cmd = "cd api && node src/server.js"
