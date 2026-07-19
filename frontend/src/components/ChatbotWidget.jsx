@@ -207,7 +207,7 @@ export default function ChatbotWidget({ walletAddress, userRole }) {
             </svg>
             <div>
               <h4 style={{ margin: 0, fontSize: '0.9rem', color: 'white', fontWeight: 700, fontFamily: 'var(--font-display)' }}>Aletheia Support AI</h4>
-              <p style={{ margin: 0, fontSize: '0.65rem', color: 'var(--color-teal)', fontWeight: 600 }}>● Echo Assistant Online</p>
+              <p style={{ margin: 0, fontSize: '0.65rem', color: 'var(--color-teal)', fontWeight: 600 }}>● AI Assistant Online</p>
             </div>
           </div>
 

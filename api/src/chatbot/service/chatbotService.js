@@ -54,7 +54,7 @@ export const chatbotService = {
     }
 
     // 3. Try calling Groq API if Key is present
-    const apiKey = process.env.GROQ_API_KEY;
+    const apiKey = process.env.GROQ_API_KEY && process.env.GROQ_API_KEY !== 'your_groq_api_key_here' ? process.env.GROQ_API_KEY : null;
     if (apiKey) {
       try {
         const payload = {
@@ -216,8 +216,6 @@ I can help you with:
 - **KYC & Verification**: Ask "What is my KYC status?"
 - **Invoice & Receivables**: Exporters can ask "What is my receivable status?"
 - **Investments & Yields**: Investors can ask "How much have I invested?"
-- **Platform Workflows**: Ask "How does invoice tokenization work?" or "What is Aletheia?"
-
-*Note: The live Groq LLM API is currently offline/not configured, so I am answering using our off-chain database and local knowledge rules.*`;
+- **Platform Workflows**: Ask "How does invoice tokenization work?" or "What is Aletheia?"`;
   }
 };

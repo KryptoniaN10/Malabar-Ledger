@@ -30,7 +30,7 @@ export default function Navbar({ walletAddress, userRole, connecting, onConnect,
         alignItems: 'center'
       }}>
         {/* Logo */}
-        <NavLink to="/" className="navbar-logo" style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+        <div className="navbar-logo" style={{ display: 'flex', alignItems: 'center', gap: '8px', cursor: 'default' }}>
           <svg width="24" height="24" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg">
             <path d="M5 20L12 4L19 20" stroke="var(--color-teal)" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round" />
             <path d="M9 13C9 13 10.5 10.5 12 13C13.5 15.5 15 13 15 13" stroke="var(--color-saffron)" strokeWidth="2" strokeLinecap="round" />
@@ -39,7 +39,7 @@ export default function Navbar({ walletAddress, userRole, connecting, onConnect,
           <span style={{ fontFamily: 'var(--font-display)', fontSize: '1.25rem', fontWeight: 700, color: 'var(--color-text-primary)' }}>
             ALETHEIA
           </span>
-        </NavLink>
+        </div>
 
         {/* Links */}
         <ul className="navbar-links" style={{
@@ -49,7 +49,7 @@ export default function Navbar({ walletAddress, userRole, connecting, onConnect,
           margin: 0,
           padding: 0
         }}>
-          {!walletAddress && (
+          {(!walletAddress || isMarketplaceFromHome) && (
             <li>
               <NavLink to="/" className={({ isActive }) => isActive ? 'active' : ''} end>
                 Home
