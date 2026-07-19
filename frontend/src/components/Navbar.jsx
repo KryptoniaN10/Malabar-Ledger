@@ -49,11 +49,13 @@ export default function Navbar({ walletAddress, userRole, connecting, onConnect,
           margin: 0,
           padding: 0
         }}>
-          <li>
-            <NavLink to="/" className={({ isActive }) => isActive ? 'active' : ''} end>
-              Home
-            </NavLink>
-          </li>
+          {!walletAddress && (
+            <li>
+              <NavLink to="/" className={({ isActive }) => isActive ? 'active' : ''} end>
+                Home
+              </NavLink>
+            </li>
+          )}
           {!isMarketplaceFromHome && !isLandingPage && walletAddress && userRole === 'investor' && (
             <>
               <li>
