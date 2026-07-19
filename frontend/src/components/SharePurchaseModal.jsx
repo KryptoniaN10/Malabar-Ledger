@@ -12,8 +12,8 @@ export default function SharePurchaseModal({ receivable, investorAddress, onClos
   const totalInvested = investments.reduce((s, i) => s + i.share_cents / 100, 0);
   const remaining = Math.max(0, amount_usd - totalInvested);
 
-  const MIN_SHARE = 100;        // $100 minimum
-  const [shareUsd, setShareUsd] = useState(Math.min(remaining, 1000));
+  const MIN_SHARE = 1;        // $1 minimum
+  const [shareUsd, setShareUsd] = useState(Math.min(remaining, 10));
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState(null);
   const [success, setSuccess] = useState(null);
@@ -144,7 +144,7 @@ export default function SharePurchaseModal({ receivable, investorAddress, onClos
             type="range"
             min={MIN_SHARE}
             max={remaining}
-            step={100}
+            step={1}
             value={shareUsd}
             onChange={(e) => setShareUsd(Number(e.target.value))}
             id="share-slider"
