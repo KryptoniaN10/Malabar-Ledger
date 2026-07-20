@@ -16,6 +16,7 @@ import { sha256, pinToIPFS, validateDocument, validateIEC } from '../services/ip
 import {
   invokeContract,
   scAddress, scU128, scI128, scU32, scString, scBytes,
+  scSymbol, scU64, scVec
 } from '../services/soroban.js';
 import { horizonServer, authorizeInvestorTrustline } from '../services/stellar.js';
 import {
@@ -30,29 +31,38 @@ const STELLAR_EXPERT_BASE = NETWORK === 'mainnet'
   ? 'https://stellar.expert/explorer/public'
   : 'https://stellar.expert/explorer/testnet';
 
+function isStellarTxHash(hash) {
+  return typeof hash === 'string' && /^[a-f0-9]{64}$/i.test(hash);
+}
+
 function stellarExpertTx(hash) {
   if (!isStellarTxHash(hash)) return null;
   return `${STELLAR_EXPERT_BASE}/tx/${hash}`;
 }
 
-function isStellarTxHash(hash) {
-  return typeof hash === 'string' && /^[a-f0-9]{64}$/i.test(hash);
-}
-
-function stellarExpertAsset(assetCode, issuerPublicKey) {
+// Only generate an asset URL when we have proof the asset was actually minted
+// on-chain (i.e., mint_tx_hash is a real 64-char hex Stellar hash).
+// Without this guard the link points to a non-existent asset and Stellar Expert
+// shows "The asset does not exist on the ledger."
+function stellarExpertAsset(assetCode, issuerPublicKey, mintTxHash) {
   if (!assetCode || !issuerPublicKey || issuerPublicKey.startsWith('demo')) return null;
+  if (!isStellarTxHash(mintTxHash)) return null; // asset not confirmed on-chain yet
   return `${STELLAR_EXPERT_BASE}/asset/${assetCode}-${issuerPublicKey}`;
 }
 
 function stellarExpertReceivableLinks(rec, issuerPublicKey) {
   const registryUrl = stellarExpertTx(rec.registry_tx_hash);
-  const mintUrl = stellarExpertTx(rec.mint_tx_hash);
+  const mintUrl     = stellarExpertTx(rec.mint_tx_hash);
+  const listUrl     = stellarExpertTx(rec.list_tx_hash);
 
   return {
-    stellar_expert_asset_url: stellarExpertAsset(rec.token_asset_code, issuerPublicKey),
+    // Only non-null when mint_tx_hash is a confirmed on-chain hash
+    stellar_expert_asset_url: stellarExpertAsset(rec.token_asset_code, issuerPublicKey, rec.mint_tx_hash),
     stellar_expert_registry_url: registryUrl,
     stellar_expert_mint_url: mintUrl,
-    stellar_expert_transaction_url: mintUrl || registryUrl,
+    stellar_expert_list_url: listUrl,
+    // Prefer: listing tx → mint tx → registry tx (most recent first)
+    stellar_expert_transaction_url: listUrl || mintUrl || registryUrl,
   };
 }
 
@@ -180,15 +190,19 @@ router.post('/register', upload.single('document'), async (req, res, next) => {
     let chainId = null;
     let registryTxHash = null;
     try {
+      const buyerHash = sha256(buyer_name || 'unknown');
       const { txHash, result: onChainResult } = await invokeContract(
         process.env.RECEIVABLE_REGISTRY_CONTRACT_ID,
         'register_receivable',
         [
           scAddress(exporter_address),
-          scU128(newId),
+          scBytes(buyerHash),
           scI128(Math.round(parseFloat(amount_usd) * 100)), // cents
-          scString(maturity_date),
+          scSymbol('USDC'),
+          scU64(Math.floor(new Date(maturity_date).getTime() / 1000)),
           scBytes(docHash),
+          scBytes(Buffer.from(cid || '', 'utf8').toString('hex')),
+          scVec([scAddress(process.env.ORACLE_PUBLIC_KEY)]), // dummy attestor for now
         ],
         process.env.ISSUER_SECRET_KEY
       );
@@ -253,7 +267,6 @@ router.post('/:id/attest', async (req, res, next) => {
         [
           scAddress(attestor_address),
           scU128(receivableId),
-          scString(attestor_role || 'unknown'),
         ],
         process.env.ISSUER_SECRET_KEY
       );
@@ -341,7 +354,9 @@ router.post('/:id/attest', async (req, res, next) => {
         stellar_expert_url: stellarExpertTx(mintTxHash) || stellarExpertTx(attestTxHash),
         stellar_expert_tx_url: stellarExpertTx(mintTxHash),
         stellar_expert_transaction_url: stellarExpertTx(mintTxHash) || stellarExpertTx(attestTxHash),
-        stellar_expert_asset_url: stellarExpertAsset(assetCode, process.env.ISSUER_PUBLIC_KEY),
+        // Only non-null when mintTxHash is a confirmed on-chain hash —
+        // prevents "The asset does not exist on the ledger" error on Stellar Expert
+        stellar_expert_asset_url: stellarExpertAsset(assetCode, process.env.ISSUER_PUBLIC_KEY, mintTxHash),
       });
     }
 
@@ -360,7 +375,7 @@ router.post('/:id/attest', async (req, res, next) => {
 router.post('/:id/list-sale', async (req, res, next) => {
   try {
     const db = getDb();
-    const { discount_bps } = req.body;
+    const { discount_bps, exporter_address, tx_hash } = req.body;
     const receivableId = parseInt(req.params.id);
 
     const rec = db.prepare('SELECT * FROM receivables WHERE id = ?').get(receivableId);
@@ -378,26 +393,38 @@ router.post('/:id/list-sale', async (req, res, next) => {
     ).run(bps, receivableId);
 
     // ── On-chain: FractionalSale.list_for_sale() ─────────────
-    let listTxHash = null;
-    try {
-      const { txHash } = await invokeContract(
-        process.env.FRACTIONAL_SALE_CONTRACT_ID,
-        'list_for_sale',
-        [
-          scAddress(rec.exporter_address),
-          scU128(receivableId),
-          scI128(faceCents),
-          scU32(bps),
-          scI128(100_00),      // min share: $100
-          scI128(faceCents),   // max share: full face value
-          // stablecoin_address — USDC on testnet
-          scAddress(process.env.USDC_CONTRACT_ID || 'CBIELTK6YBZJU5UP2WWQEUCYKLPU6AUNZ2BQ4WWFEIE3USCIHMXQDAMA'),
-        ],
-        process.env.ISSUER_SECRET_KEY
-      );
-      listTxHash = txHash;
-    } catch (chainErr) {
-      console.warn('[list-sale] On-chain call failed (demo ok):', chainErr.message);
+    // If the frontend (Freighter-signed) already submitted this tx, it passes
+    // the hash here — skip the server-side invocation in that case.
+    // Use isStellarTxHash to reject demo_ placeholder hashes.
+    let listTxHash = isStellarTxHash(tx_hash) ? tx_hash : null;
+    if (!listTxHash) {
+      try {
+        const { txHash } = await invokeContract(
+          process.env.FRACTIONAL_SALE_CONTRACT_ID,
+          'list_for_sale',
+          [
+            scAddress(exporter_address || rec.exporter_address),
+            scU128(receivableId),
+            scI128(faceCents),
+            scU32(bps),
+            scI128(100_00),      // min share: $100
+            scI128(faceCents),   // max share: full face value
+            // stablecoin_address — USDC on testnet
+            scAddress(process.env.USDC_CONTRACT_ID || 'CBIELTK6YBZJU5UP2WWQEUCYKLPU6AUNZ2BQ4WWFEIE3USCIHMXQDAMA'),
+          ],
+          process.env.ISSUER_SECRET_KEY
+        );
+        if (isStellarTxHash(txHash)) listTxHash = txHash;
+      } catch (chainErr) {
+        console.warn('[list-sale] On-chain call failed (demo ok):', chainErr.message);
+      }
+    }
+
+    // Persist list tx hash so the detail view can link to it on page refresh
+    if (listTxHash) {
+      db.prepare(
+        'UPDATE receivables SET list_tx_hash = ?, updated_at = CURRENT_TIMESTAMP WHERE id = ?'
+      ).run(listTxHash, receivableId);
     }
 
     res.json({
@@ -408,6 +435,7 @@ router.post('/:id/list-sale', async (req, res, next) => {
       status: 'active',
       list_tx: listTxHash,
       message: 'Listed for fractional sale',
+      // Only non-null when listTxHash is a real Stellar hash (not demo_...)
       stellar_expert_url: stellarExpertTx(listTxHash),
     });
   } catch (err) {

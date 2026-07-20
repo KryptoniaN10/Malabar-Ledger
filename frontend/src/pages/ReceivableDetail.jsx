@@ -79,6 +79,7 @@ export default function ReceivableDetail({ walletAddress, onConnect, onOpenLogin
     stellar_expert_transaction_url,
     stellar_expert_registry_url,
     stellar_expert_mint_url,
+    stellar_expert_list_url,
   } = receivable;
 
   const totalInvested = investments.reduce((s, i) => s + (i.share_cents / 100), 0);
@@ -86,10 +87,14 @@ export default function ReceivableDetail({ walletAddress, onConnect, onOpenLogin
   const remaining = Math.max(0, amount_usd - totalInvested);
   const days = daysUntil(maturity_date);
   const { discount, apy } = formatYield(discount_bps, days);
+
+  // Avoid duplicating the "latest tx" link in secondary links
   const secondaryRegistryUrl =
     stellar_expert_registry_url !== stellar_expert_transaction_url ? stellar_expert_registry_url : null;
   const secondaryMintUrl =
     stellar_expert_mint_url !== stellar_expert_transaction_url ? stellar_expert_mint_url : null;
+  const secondaryListUrl =
+    stellar_expert_list_url !== stellar_expert_transaction_url ? stellar_expert_list_url : null;
 
   return (
     <main className="page-content">
@@ -150,7 +155,7 @@ export default function ReceivableDetail({ walletAddress, onConnect, onOpenLogin
 
             {/* Exporter Info Card */}
             <div className="card">
-              <h3 style={{ fontFamily: 'var(--font-display)', marginBottom: 'var(--space-3)' }}>Exporter & Shipping Manifest</h3>
+              <h3 style={{ fontFamily: 'var(--font-display)', marginBottom: 'var(--space-3)' }}>Exporter &amp; Shipping Manifest</h3>
               <div style={{ display: 'flex', flexDirection: 'column', gap: 'var(--space-3)' }}>
                 <div className="flex justify-between items-center" style={{ borderBottom: '1px solid var(--color-border)', paddingBottom: '8px' }}>
                   <span className="text-ui-sm text-secondary">Exporter</span>
@@ -178,7 +183,7 @@ export default function ReceivableDetail({ walletAddress, onConnect, onOpenLogin
               <p className="text-ui-sm text-secondary" style={{ marginBottom: 'var(--space-4)' }}>
                 This trade bill is secured on the Stellar blockchain. Document validation hashes match off-chain IPFS assets directly.
               </p>
-              
+
               <div className="flex flex-col gap-3">
                 <div style={{ background: 'var(--color-bg-elevated)', padding: '12px', borderRadius: 'var(--radius-md)', border: '1px solid var(--color-border)' }}>
                   <span className="form-label" style={{ fontSize: '0.65rem', display: 'block', marginBottom: '4px' }}>Document Hash (SHA-256)</span>
@@ -189,8 +194,8 @@ export default function ReceivableDetail({ walletAddress, onConnect, onOpenLogin
                   <span className="monospace text-ui-xs text-secondary" style={{ wordBreak: 'break-all' }}>{ipfs_cid || 'Unassigned'}</span>
                 </div>
 
-                {/* Stellar Expert on-chain links */}
-                {(stellar_expert_transaction_url || secondaryRegistryUrl || secondaryMintUrl) && (
+                {/* Stellar Expert on-chain links — only shown when at least one real tx hash exists */}
+                {(stellar_expert_transaction_url || secondaryRegistryUrl || secondaryMintUrl || secondaryListUrl) && (
                   <div style={{ background: 'var(--color-bg-elevated)', padding: '12px', borderRadius: 'var(--radius-md)', border: '1px solid rgba(0,201,167,0.2)' }}>
                     <span className="form-label" style={{ fontSize: '0.65rem', display: 'block', marginBottom: '8px' }}>Stellar Testnet Transactions</span>
                     <div style={{ display: 'flex', flexDirection: 'column', gap: '6px' }}>
@@ -201,17 +206,17 @@ export default function ReceivableDetail({ walletAddress, onConnect, onOpenLogin
                           rel="noopener noreferrer"
                           style={{ color: 'var(--color-teal-light)', fontSize: '0.75rem', textDecoration: 'underline', display: 'flex', alignItems: 'center', gap: 4 }}
                         >
-                          View latest transaction on Stellar Expert -&gt;
+                          View latest transaction on Stellar Expert →
                         </a>
                       )}
-                      {secondaryRegistryUrl && (
+                      {secondaryListUrl && (
                         <a
-                          href={secondaryRegistryUrl}
+                          href={secondaryListUrl}
                           target="_blank"
                           rel="noopener noreferrer"
-                          style={{ color: 'var(--color-text-muted)', fontSize: '0.75rem', textDecoration: 'underline', display: 'flex', alignItems: 'center', gap: 4 }}
+                          style={{ color: 'var(--color-saffron)', fontSize: '0.75rem', textDecoration: 'underline', display: 'flex', alignItems: 'center', gap: 4 }}
                         >
-                          📄 Registration TX on Stellar Expert ↗
+                          🏷️ Listing TX on Stellar Expert ↗
                         </a>
                       )}
                       {secondaryMintUrl && (
@@ -222,6 +227,16 @@ export default function ReceivableDetail({ walletAddress, onConnect, onOpenLogin
                           style={{ color: 'var(--color-saffron)', fontSize: '0.75rem', textDecoration: 'underline', display: 'flex', alignItems: 'center', gap: 4 }}
                         >
                           🪙 Token Mint TX on Stellar Expert ↗
+                        </a>
+                      )}
+                      {secondaryRegistryUrl && (
+                        <a
+                          href={secondaryRegistryUrl}
+                          target="_blank"
+                          rel="noopener noreferrer"
+                          style={{ color: 'var(--color-text-muted)', fontSize: '0.75rem', textDecoration: 'underline', display: 'flex', alignItems: 'center', gap: 4 }}
+                        >
+                          📄 Registration TX on Stellar Expert ↗
                         </a>
                       )}
                     </div>
@@ -236,20 +251,20 @@ export default function ReceivableDetail({ walletAddress, onConnect, onOpenLogin
             {/* Purchase Control Panel */}
             <div className="card card-gold">
               <h3 style={{ fontFamily: 'var(--font-display)', marginBottom: 'var(--space-3)' }}>Investment Panel</h3>
-              
+
               {status === 'active' ? (
                 <>
                   <div style={{ marginBottom: 'var(--space-4)' }}>
                     <ProgressBar progress={pctSold} />
                   </div>
-                  
+
                   <div className="flex justify-between items-center" style={{ marginBottom: 'var(--space-3)' }}>
                     <span className="text-ui-sm text-secondary">Remaining Cap</span>
                     <span style={{ fontWeight: 700, color: 'var(--color-teal)' }}>{formatUsd(remaining * 100)}</span>
                   </div>
 
-                  <button 
-                    className="btn btn-primary btn-full" 
+                  <button
+                    className="btn btn-primary btn-full"
                     onClick={() => {
                       if (walletAddress) {
                         setShowPurchase(true);
@@ -340,7 +355,7 @@ export default function ReceivableDetail({ walletAddress, onConnect, onOpenLogin
 
         {/* Share Purchase Modal */}
         {showPurchase && (
-          <SharePurchaseModal 
+          <SharePurchaseModal
             receivable={receivable}
             investorAddress={walletAddress}
             onClose={() => setShowPurchase(false)}

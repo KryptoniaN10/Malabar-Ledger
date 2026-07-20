@@ -53,6 +53,7 @@ export async function initDb() {
       token_asset_code    TEXT,
       registry_tx_hash    TEXT,   -- Stellar tx hash of on-chain registration
       mint_tx_hash        TEXT,   -- Stellar tx hash of token mint (Horizon)
+      list_tx_hash        TEXT,   -- Stellar tx hash of list_for_sale invocation
       created_at          DATETIME DEFAULT CURRENT_TIMESTAMP,
       updated_at          DATETIME DEFAULT CURRENT_TIMESTAMP
     );
@@ -122,6 +123,7 @@ export async function initDb() {
   const migrations = [
     "ALTER TABLE receivables ADD COLUMN registry_tx_hash TEXT",
     "ALTER TABLE receivables ADD COLUMN mint_tx_hash TEXT",
+    "ALTER TABLE receivables ADD COLUMN list_tx_hash TEXT",
   ];
   for (const sql of migrations) {
     try { db.exec(sql); } catch { /* column already exists — safe to ignore */ }

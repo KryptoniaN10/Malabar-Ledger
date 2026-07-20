@@ -1,5 +1,5 @@
 import React, { useState, useEffect, useCallback } from 'react';
-import { receivablesApi, authApi, oracleApi, formatUsd } from '../stellar/client.js';
+import { receivablesApi, authApi, oracleApi, formatUsd, listReceivableWithFreighter } from '../stellar/client.js';
 
 import { StatusBadge } from '../components/ReceivableCard.jsx';
 import { AttestationMini } from '../components/ReceivableCard.jsx';
@@ -191,9 +191,24 @@ export default function AdminPanel({ walletAddress }) {
                             attestor_role: role,
                           })
                         )}
-                        onListSale={(discountBps) => runAction(`list-${rec.id}`, () =>
-                          receivablesApi.listSale(rec.id, { discount_bps: discountBps })
-                        )}
+                        onListSale={(discountBps) => runAction(`list-${rec.id}`, async () => {
+                          let txHash = null;
+                          if (walletAddress && walletAddress === rec.exporter_address) {
+                            const signed = await listReceivableWithFreighter({
+                              exporterAddress: walletAddress,
+                              receivableId: rec.id,
+                              faceValueUsd: rec.amount_usd,
+                              discountBps,
+                            });
+                            txHash = signed.hash;
+                          }
+
+                          return receivablesApi.listSale(rec.id, {
+                            discount_bps: discountBps,
+                            exporter_address: walletAddress,
+                            tx_hash: txHash,
+                          });
+                        })}
                         onConfirmPayment={() => runAction(`confirm-${rec.id}`, () =>
                           oracleApi.confirmPayment(rec.id, {
                             confirmed_amount_usd: rec.amount_usd,

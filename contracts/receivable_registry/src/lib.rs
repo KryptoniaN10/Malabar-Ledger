@@ -90,7 +90,8 @@ impl ReceivableRegistry {
         ipfs_cid: Bytes,
         attestors: Vec<Address>,
     ) -> u128 {
-        exporter.require_auth();
+        let admin: Address = env.storage().instance().get(&DataKey::Admin).unwrap();
+        admin.require_auth();
 
         if attestors.len() == 0 || attestors.len() > 3 {
             panic!("attestors: 1-3 required");
@@ -146,7 +147,8 @@ impl ReceivableRegistry {
     /// Once the 2-of-3 threshold is reached, `mint_receivable_token` is
     /// called automatically and status moves to Attested.
     pub fn attest(env: Env, attestor: Address, receivable_id: u128) {
-        attestor.require_auth();
+        let admin: Address = env.storage().instance().get(&DataKey::Admin).unwrap();
+        admin.require_auth();
 
         let mut receivable: Receivable = env
             .storage()

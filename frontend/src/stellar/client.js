@@ -6,20 +6,58 @@
 //  real Soroban invocations — the API surface is identical.
 // ============================================================
 
-import { Horizon, Networks, Asset, TransactionBuilder, Operation, Memo, BASE_FEE } from '@stellar/stellar-sdk';
+import { Horizon, Networks, Asset, TransactionBuilder, Operation, Memo, BASE_FEE, Contract, SorobanRpc, nativeToScVal } from '@stellar/stellar-sdk';
 import { requestAccess, getPublicKey, signTransaction } from '@stellar/freighter-api';
 
 const NETWORK = import.meta.env.VITE_STELLAR_NETWORK || 'testnet';
 const HORIZON_URL = import.meta.env.VITE_HORIZON_URL || 'https://horizon-testnet.stellar.org';
+const SOROBAN_RPC_URL = import.meta.env.VITE_STELLAR_RPC_URL || 'https://soroban-testnet.stellar.org';
 const API_URL = import.meta.env.VITE_API_URL || 'http://localhost:3001';
+const FRACTIONAL_SALE_CONTRACT_ID = import.meta.env.VITE_FRACTIONAL_SALE_CONTRACT_ID;
+const USDC_CONTRACT_ID = import.meta.env.VITE_USDC_CONTRACT_ID || 'CBIELTK6YBZJU5UP2WWQEUCYKLPU6AUNZ2BQ4WWFEIE3USCIHMXQDAMA';
 
 export const horizonServer = new Horizon.Server(HORIZON_URL);
+export const sorobanRpcServer = new SorobanRpc.Server(SOROBAN_RPC_URL, {
+  allowHttp: SOROBAN_RPC_URL.startsWith('http://'),
+});
 
 // Stellar Expert deep-link base (switches mainnet/testnet automatically)
 export const HORIZON_EXPLORER_URL =
   NETWORK === 'mainnet'
     ? 'https://stellar.expert/explorer/public'
     : 'https://stellar.expert/explorer/testnet';
+
+const NETWORK_PASSPHRASE = NETWORK === 'mainnet' ? Networks.PUBLIC : Networks.TESTNET;
+
+function signedXdrFromFreighterResult(signed) {
+  if (typeof signed === 'string') return signed;
+  return signed?.signedTxXdr || signed?.signedXdr || signed?.transactionXdr || null;
+}
+
+async function signXdrWithFreighter(txXdr, accountToSign) {
+  const opts = {
+    network: NETWORK.toUpperCase(),
+    networkPassphrase: NETWORK_PASSPHRASE,
+    ...(accountToSign ? { accountToSign } : {}),
+  };
+
+  let signed;
+  try {
+    signed = await signTransaction(txXdr, opts);
+  } catch (freighterApiErr) {
+    if (window.stellar && typeof window.stellar.signTransaction === 'function') {
+      signed = await window.stellar.signTransaction(txXdr, opts);
+    } else {
+      throw freighterApiErr;
+    }
+  }
+
+  const signedXdr = signedXdrFromFreighterResult(signed);
+  if (!signedXdr) {
+    throw new Error('Signing failed: no transaction signature returned');
+  }
+  return signedXdr;
+}
 
 // ── Freighter wallet integration ──────────────────────────────
 
@@ -90,7 +128,7 @@ export async function signTransactionWithFreighter({ investorAddress, paymentUsd
 
   const tx = new TransactionBuilder(account, {
     fee: BASE_FEE,
-    networkPassphrase: NETWORK === 'mainnet' ? Networks.PUBLIC : Networks.TESTNET,
+    networkPassphrase: NETWORK_PASSPHRASE,
   })
     .addOperation(
       Operation.payment({
@@ -105,31 +143,10 @@ export async function signTransactionWithFreighter({ investorAddress, paymentUsd
 
   const txXdr = tx.toXDR();
 
-  // Ask Freighter to sign (with direct window.stellar fallback for mobile webview)
-  let signed;
-  try {
-    signed = await signTransaction(txXdr, {
-      networkPassphrase: NETWORK === 'mainnet' ? Networks.PUBLIC : Networks.TESTNET,
-    });
-  } catch (freighterApiErr) {
-    if (window.stellar && typeof window.stellar.signTransaction === 'function') {
-      const networkPassphrase = NETWORK === 'mainnet' ? Networks.PUBLIC : Networks.TESTNET;
-      const signedXdr = await window.stellar.signTransaction(txXdr, {
-        network: NETWORK.toUpperCase(),
-        networkPassphrase,
-      });
-      signed = { signedTxXdr: signedXdr };
-    } else {
-      throw freighterApiErr;
-    }
-  }
-
-  if (!signed || !signed.signedTxXdr) {
-    throw new Error('Signing failed: no transaction signature returned');
-  }
+  const signedXdr = await signXdrWithFreighter(txXdr, investorAddress);
 
   // Submit signed transaction to Horizon
-  const signedTx = TransactionBuilder.fromXDR(signed.signedTxXdr, NETWORK === 'mainnet' ? Networks.PUBLIC : Networks.TESTNET);
+  const signedTx = TransactionBuilder.fromXDR(signedXdr, NETWORK_PASSPHRASE);
   const result = await horizonServer.submitTransaction(signedTx);
   return { hash: result.hash };
 }
@@ -147,36 +164,63 @@ export async function executeSponsoredTrustline(beneficiaryAddress, assetCode) {
     return false;
   }
 
-  // Ask Freighter to sign (with direct window.stellar fallback for mobile webview)
-  let signed;
-  try {
-    signed = await signTransaction(response.xdr, {
-      networkPassphrase: NETWORK === 'mainnet' ? Networks.PUBLIC : Networks.TESTNET,
-    });
-  } catch (freighterApiErr) {
-    if (window.stellar && typeof window.stellar.signTransaction === 'function') {
-      const networkPassphrase = NETWORK === 'mainnet' ? Networks.PUBLIC : Networks.TESTNET;
-      const signedXdr = await window.stellar.signTransaction(response.xdr, {
-        network: NETWORK.toUpperCase(),
-        networkPassphrase,
-      });
-      signed = { signedTxXdr: signedXdr };
-    } else {
-      throw freighterApiErr;
-    }
-  }
-
-  if (!signed || !signed.signedTxXdr) {
-    throw new Error('Signing failed: no transaction signature returned');
-  }
+  const signedXdr = await signXdrWithFreighter(response.xdr, beneficiaryAddress);
 
   // Submit to Horizon
-  const signedTx = TransactionBuilder.fromXDR(signed.signedTxXdr, NETWORK === 'mainnet' ? Networks.PUBLIC : Networks.TESTNET);
+  const signedTx = TransactionBuilder.fromXDR(signedXdr, NETWORK_PASSPHRASE);
   const result = await horizonServer.submitTransaction(signedTx);
   return { hash: result.hash };
 }
 
 // ── Horizon queries ───────────────────────────────────────────
+
+export async function listReceivableWithFreighter({ exporterAddress, receivableId, faceValueUsd, discountBps }) {
+  if (!FRACTIONAL_SALE_CONTRACT_ID) {
+    throw new Error('VITE_FRACTIONAL_SALE_CONTRACT_ID is not configured');
+  }
+
+  const faceValueCents = BigInt(Math.round(Number(faceValueUsd) * 100));
+  const contract = new Contract(FRACTIONAL_SALE_CONTRACT_ID);
+  const account = await sorobanRpcServer.getAccount(exporterAddress);
+
+  const tx = new TransactionBuilder(account, {
+    fee: BASE_FEE,
+    networkPassphrase: NETWORK_PASSPHRASE,
+  })
+    .addOperation(contract.call(
+      'list_for_sale',
+      nativeToScVal(exporterAddress, { type: 'address' }),
+      nativeToScVal(BigInt(receivableId), { type: 'u128' }),
+      nativeToScVal(faceValueCents, { type: 'i128' }),
+      nativeToScVal(Number(discountBps), { type: 'u32' }),
+      nativeToScVal(10000n, { type: 'i128' }),
+      nativeToScVal(faceValueCents, { type: 'i128' }),
+      nativeToScVal(USDC_CONTRACT_ID, { type: 'address' })
+    ))
+    .setTimeout(180)
+    .build();
+
+  const preparedTx = await sorobanRpcServer.prepareTransaction(tx);
+  const signedXdr = await signXdrWithFreighter(preparedTx.toXDR(), exporterAddress);
+  const signedTx = TransactionBuilder.fromXDR(signedXdr, NETWORK_PASSPHRASE);
+  const sendResult = await sorobanRpcServer.sendTransaction(signedTx);
+
+  if (sendResult.status === 'ERROR') {
+    throw new Error(`Soroban submit failed: ${JSON.stringify(sendResult.errorResult)}`);
+  }
+
+  const txHash = sendResult.hash;
+  for (let i = 0; i < 15; i += 1) {
+    await new Promise((resolve) => setTimeout(resolve, 2000));
+    const txResult = await sorobanRpcServer.getTransaction(txHash);
+    if (txResult.status === 'SUCCESS') return { hash: txHash };
+    if (txResult.status === 'FAILED') {
+      throw new Error(`Soroban transaction failed: ${txHash}`);
+    }
+  }
+
+  return { hash: txHash };
+}
 
 export async function getAccountBalances(publicKey) {
   try {

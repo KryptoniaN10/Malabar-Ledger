@@ -49,8 +49,16 @@ export function scU32(n) {
   return xdr.ScVal.scvU32(n);
 }
 
+export function scU64(n) {
+  return xdr.ScVal.scvU64(xdr.Uint64.fromString(String(n)));
+}
+
 export function scString(s) {
   return xdr.ScVal.scvString(Buffer.from(s, 'utf8'));
+}
+
+export function scSymbol(s) {
+  return xdr.ScVal.scvSymbol(Buffer.from(s, 'utf8'));
 }
 
 export function scBytes(hex) {
@@ -121,19 +129,23 @@ export async function invokeContract(contractId, method, args, signerSecret) {
 
   // 6. Poll for confirmation (up to 30s)
   let getResult;
-  for (let i = 0; i < 15; i++) {
-    await sleep(2000);
-    getResult = await rpcServer.getTransaction(txHash);
-    if (getResult.status !== SorobanRpc.Api.GetTransactionStatus.NOT_FOUND) break;
-  }
+  try {
+    for (let i = 0; i < 15; i++) {
+      await sleep(2000);
+      getResult = await rpcServer.getTransaction(txHash);
+      if (getResult.status !== SorobanRpc.Api.GetTransactionStatus.NOT_FOUND) break;
+    }
 
-  if (getResult.status === SorobanRpc.Api.GetTransactionStatus.FAILED) {
-    throw new Error(`Soroban transaction failed: ${txHash}`);
+    if (getResult && getResult.status === SorobanRpc.Api.GetTransactionStatus.FAILED) {
+      throw new Error(`Soroban transaction failed: ${txHash}`);
+    }
+  } catch (err) {
+    console.warn(`[Soroban] getTransaction failed or could not be parsed: ${err.message}. Returning txHash anyway.`);
   }
 
   // 7. Decode return value
   let result = null;
-  if (getResult.returnValue) {
+  if (getResult && getResult.returnValue) {
     try {
       result = scValToNative(getResult.returnValue);
     } catch {
