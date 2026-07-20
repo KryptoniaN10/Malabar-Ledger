@@ -286,7 +286,7 @@ router.post('/:id/attest', async (req, res, next) => {
     db.prepare('UPDATE receivables SET attestation_count = ?, updated_at = CURRENT_TIMESTAMP WHERE id = ?')
       .run(count, receivableId);
 
-    // ── Threshold met: mint Stellar asset ────────────────────
+    // ── Threshold met: mint Stellar asset (or prepare a co-signed mint) ───────────────────
     if (count >= 2 && rec.status === 'pending') {
       const assetCode = `ML${String(receivableId).padStart(4, '0')}`;
 
@@ -299,9 +299,55 @@ router.post('/:id/attest', async (req, res, next) => {
       // We send setOptions first in the same tx to ensure the flags are set,
       // then payment to issue the tokens.
       let mintTxHash = null;
-      if (process.env.ISSUER_SECRET_KEY) {
+      // If client requested a co-sign flow, prepare a partially-signed XDR and return it
+      // to the caller so the admin (Freighter) can add their signature and submit.
+      const { co_sign, admin_address } = req.body || {};
+      const issuerKp = getIssuerKp();
+
+      if (co_sign && admin_address && issuerKp) {
         try {
-          const issuerKp = Keypair.fromSecret(process.env.ISSUER_SECRET_KEY);
+          // Build transaction with admin as fee-payer (source account)
+          const adminAccount = await horizonServer.loadAccount(admin_address);
+          const receivableAsset = new Asset(assetCode, issuerKp.publicKey());
+
+          const mintTx = new TransactionBuilder(adminAccount, {
+            fee: BASE_FEE,
+            networkPassphrase: PASSPHRASE,
+          })
+            .addOperation(Operation.setOptions({
+              source: issuerKp.publicKey(),
+              setFlags: 11,
+            }))
+            .addOperation(Operation.payment({
+              source: issuerKp.publicKey(),
+              destination: rec.exporter_address,
+              asset: receivableAsset,
+              amount: String(rec.amount_usd),
+            }))
+            .setTimeout(30)
+            .build();
+
+          // Server signs as issuer (partial signature)
+          mintTx.sign(Keypair.fromSecret(process.env.ISSUER_SECRET_KEY));
+
+          const preparedXdr = mintTx.toXDR();
+          // Return prepared XDR to frontend for Freighter signing and submission
+          return res.json({
+            attestation_count: count,
+            status: 'attested',
+            token_asset_code: assetCode,
+            prepared_xdr: preparedXdr,
+            message: 'Threshold met — prepared partially-signed mint XDR. Sign and submit from admin wallet.',
+          });
+        } catch (prepErr) {
+          console.error('[attest] Prepare mint XDR failed:', prepErr.message);
+          console.error(prepErr.stack);
+        }
+      }
+
+      // Fallback: server-side minting (existing behavior)
+      if (issuerKp) {
+        try {
           const issuerAccount = await horizonServer.loadAccount(issuerKp.publicKey());
           const receivableAsset = new Asset(assetCode, issuerKp.publicKey());
 
@@ -309,16 +355,13 @@ router.post('/:id/attest', async (req, res, next) => {
             fee: BASE_FEE,
             networkPassphrase: PASSPHRASE,
           })
-            // Set AUTH_REQUIRED(1) | AUTH_REVOCABLE(2) | CLAWBACK_ENABLED(8) = 11
-            // This is the correct issuer-account flag set for controlled asset issuance.
             .addOperation(Operation.setOptions({
-              setFlags: 11, // 1 | 2 | 8 — was incorrectly 7 (used LOW_THRESHOLD flag instead of CLAWBACK)
+              setFlags: 11,
             }))
-            // Issue token to exporter (represents the receivable face value)
             .addOperation(Operation.payment({
               destination: rec.exporter_address,
               asset: receivableAsset,
-              amount: String(rec.amount_usd), // face value in token units
+              amount: String(rec.amount_usd),
             }))
             .setTimeout(30)
             .build();
@@ -328,20 +371,16 @@ router.post('/:id/attest', async (req, res, next) => {
           mintTxHash = mintResult.hash;
           console.log(`[attest] Token minted on Stellar testnet — asset: ${assetCode}, tx: ${mintTxHash}`);
 
-          // Persist the mint tx hash so the frontend can link to Stellar Expert
           db.prepare('UPDATE receivables SET mint_tx_hash = ?, updated_at = CURRENT_TIMESTAMP WHERE id = ?')
             .run(mintTxHash, receivableId);
         } catch (mintErr) {
-          // Log full error so we can diagnose — common causes:
-          // - Exporter account has no trustline for the asset
-          // - Issuer account has insufficient XLM
-          // - setOptions flags already set (op_already_exists) — non-fatal
           console.error('[attest] Mint tx FAILED:', mintErr.message);
           if (mintErr.response?.data?.extras?.result_codes) {
             console.error('[attest] Horizon result codes:', JSON.stringify(mintErr.response.data.extras.result_codes));
           }
           console.error(mintErr.stack);
         }
+      }
       }
 
       return res.json({
@@ -588,6 +627,26 @@ router.post('/:id/buy-share', async (req, res, next) => {
       message: 'Share purchased successfully',
       stellar_expert_url: stellarExpertTx(purchaseTxHash),
     });
+  } catch (err) {
+    next(err);
+  }
+});
+
+// ── Submit mint tx hash after client-side (co-sign) submission ─────────────
+router.post('/:id/submit-mint', async (req, res, next) => {
+  try {
+    const db = getDb();
+    const receivableId = parseInt(req.params.id);
+    const { tx_hash } = req.body || {};
+    if (!tx_hash) return res.status(400).json({ error: 'tx_hash required' });
+
+    const rec = db.prepare('SELECT * FROM receivables WHERE id = ?').get(receivableId);
+    if (!rec) return res.status(404).json({ error: 'Not found' });
+
+    db.prepare('UPDATE receivables SET mint_tx_hash = ?, updated_at = CURRENT_TIMESTAMP WHERE id = ?')
+      .run(tx_hash, receivableId);
+
+    res.json({ ok: true, receivable_id: receivableId, mint_tx: tx_hash, stellar_expert_url: stellarExpertTx(tx_hash) });
   } catch (err) {
     next(err);
   }

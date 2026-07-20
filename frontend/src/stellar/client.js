@@ -34,7 +34,7 @@ function signedXdrFromFreighterResult(signed) {
   return signed?.signedTxXdr || signed?.signedXdr || signed?.transactionXdr || null;
 }
 
-async function signXdrWithFreighter(txXdr, accountToSign) {
+export async function signXdrWithFreighter(txXdr, accountToSign) {
   const opts = {
     network: NETWORK.toUpperCase(),
     networkPassphrase: NETWORK_PASSPHRASE,
@@ -295,6 +295,9 @@ export const receivablesApi = {
   attest: (id, body) =>
     apiCall(`/api/receivables/${id}/attest`, 'POST', body),
 
+  submitMint: (id, body) =>
+    apiCall(`/api/receivables/${id}/submit-mint`, 'POST', body),
+
   listSale: (id, body) =>
     apiCall(`/api/receivables/${id}/list-sale`, 'POST', body),
 
@@ -307,6 +310,13 @@ export const receivablesApi = {
   resetDemo: (body) =>
     apiCall('/api/receivables/reset-demo', 'POST', body),
 };
+
+// ── Submit a signed XDR to Horizon and return the result.hash ─────────────
+export async function submitSignedXdr(signedXdr) {
+  const signedTx = TransactionBuilder.fromXDR(signedXdr, NETWORK_PASSPHRASE);
+  const result = await horizonServer.submitTransaction(signedTx);
+  return { hash: result.hash };
+}
 
 // ── KYC / Auth API ────────────────────────────────────────────
 

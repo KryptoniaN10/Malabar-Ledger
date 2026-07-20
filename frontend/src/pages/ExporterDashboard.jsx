@@ -348,7 +348,7 @@ export default function ExporterDashboard({ walletAddress, onConnect }) {
                     📋 <strong>Next Step:</strong> Share your receivable hash with 2 of 3 attestors:<br />
                     <span className="text-ui-xs" style={{ opacity: 0.8 }}>Logistics Partner · Export Council · NBFC</span>
                   </div>
-                  {submitted.stellar_expert_url && (
+                  {submitted.status !== 'pending' && submitted.stellar_expert_url && (
                     <a
                       href={submitted.stellar_expert_url}
                       target="_blank"

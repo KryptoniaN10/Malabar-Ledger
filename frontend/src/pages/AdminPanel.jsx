@@ -1,5 +1,5 @@
 import React, { useState, useEffect, useCallback } from 'react';
-import { receivablesApi, authApi, oracleApi, formatUsd, listReceivableWithFreighter } from '../stellar/client.js';
+import { receivablesApi, authApi, oracleApi, formatUsd, listReceivableWithFreighter, signXdrWithFreighter, submitSignedXdr } from '../stellar/client.js';
 
 import { StatusBadge } from '../components/ReceivableCard.jsx';
 import { AttestationMini } from '../components/ReceivableCard.jsx';
@@ -185,12 +185,33 @@ export default function AdminPanel({ walletAddress }) {
                         key={rec.id}
                         rec={rec}
                         walletAddress={walletAddress}
-                        onAttest={(role) => runAction(`attest-${rec.id}-${role}`, () =>
-                          receivablesApi.attest(rec.id, {
-                            attestor_address: walletAddress || `DEMO_ATTESTOR_${role.toUpperCase()}`,
+                        onAttest={(role) => runAction(`attest-${rec.id}-${role}`, async () => {
+                          // Attempt co-sign flow when admin wallet is connected
+                          const attestorAddress = walletAddress || `DEMO_ATTESTOR_${role.toUpperCase()}`;
+                          const body = {
+                            attestor_address: attestorAddress,
                             attestor_role: role,
-                          })
-                        )}
+                          };
+                          if (walletAddress) {
+                            body.co_sign = true;
+                            body.admin_address = walletAddress;
+                          }
+
+                          const resp = await receivablesApi.attest(rec.id, body);
+
+                          // If server returned a prepared XDR, sign it with Freighter and submit
+                          if (resp && resp.prepared_xdr && walletAddress) {
+                            const signedXdr = await signXdrWithFreighter(resp.prepared_xdr, walletAddress);
+                            const result = await submitSignedXdr(signedXdr);
+                            if (result?.hash) {
+                              // Persist mint tx hash back to server
+                              await receivablesApi.submitMint(rec.id, { tx_hash: result.hash });
+                              return { ok: true, data: { message: 'Attested and mint submitted', tx_hash: result.hash } };
+                            }
+                          }
+
+                          return resp;
+                        })}
                         onListSale={(discountBps) => runAction(`list-${rec.id}`, async () => {
                           let txHash = null;
                           if (walletAddress && walletAddress === rec.exporter_address) {

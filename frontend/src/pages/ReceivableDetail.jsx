@@ -194,8 +194,8 @@ export default function ReceivableDetail({ walletAddress, onConnect, onOpenLogin
                   <span className="monospace text-ui-xs text-secondary" style={{ wordBreak: 'break-all' }}>{ipfs_cid || 'Unassigned'}</span>
                 </div>
 
-                {/* Stellar Expert on-chain links — only shown when at least one real tx hash exists */}
-                {(stellar_expert_transaction_url || secondaryRegistryUrl || secondaryMintUrl || secondaryListUrl) && (
+                {/* Stellar Expert on-chain links — only shown after attestation (hide while pending) */}
+                {status !== 'pending' && (stellar_expert_transaction_url || secondaryRegistryUrl || secondaryMintUrl || secondaryListUrl) && (
                   <div style={{ background: 'var(--color-bg-elevated)', padding: '12px', borderRadius: 'var(--radius-md)', border: '1px solid rgba(0,201,167,0.2)' }}>
                     <span className="form-label" style={{ fontSize: '0.65rem', display: 'block', marginBottom: '8px' }}>Stellar Testnet Transactions</span>
                     <div style={{ display: 'flex', flexDirection: 'column', gap: '6px' }}>

@@ -27,8 +27,17 @@ import oracleRouter from './routes/oracle.js';
 import stellarRouter from './routes/stellar.js';
 import chatbotRouter from './chatbot/routes.js';
 
+process.on('unhandledRejection', (reason) => {
+  console.error('[API] Unhandled rejection:', reason);
+});
+
+process.on('uncaughtException', (err) => {
+  console.error('[API] Uncaught exception:', err);
+});
+
 const app = express();
 const PORT = process.env.PORT || 3001;
+console.log(`[API] Starting on port ${PORT}`);
 
 // ── Middleware ────────────────────────────────────────────────
 app.use(cors({ origin: '*' }));
@@ -82,10 +91,22 @@ app.use((err, _req, res, _next) => {
 });
 
 // ── Start ─────────────────────────────────────────────────────
-initDb().then(() => {
-  app.listen(PORT, '0.0.0.0', () => {
+initDb().catch((err) => {
+  console.error('[API] Failed to initialize database:', err);
+  process.exit(1);
+}).then(() => {
+  const server = app.listen(Number(PORT), '0.0.0.0', () => {
     console.log(`\n⚖️ Aletheia API running on http://0.0.0.0:${PORT}`);
     console.log(`   Network: ${process.env.STELLAR_NETWORK || 'testnet'}`);
     console.log(`   Horizon: ${process.env.STELLAR_HORIZON_URL}\n`);
+  });
+
+  server.on('error', (err) => {
+    if (err.code === 'EADDRINUSE') {
+      console.error(`[API] Port ${PORT} is already in use. Please stop any conflicting process or set a different PORT.`);
+    } else {
+      console.error('[API] Server failed to start:', err.message);
+    }
+    process.exit(1);
   });
 });
