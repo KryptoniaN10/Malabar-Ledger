@@ -381,7 +381,6 @@ router.post('/:id/attest', async (req, res, next) => {
           console.error(mintErr.stack);
         }
       }
-      }
 
       return res.json({
         attestation_count: count,
