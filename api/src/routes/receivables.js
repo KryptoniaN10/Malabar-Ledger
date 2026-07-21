@@ -219,6 +219,9 @@ router.post('/register', upload.single('document'), async (req, res, next) => {
         db.prepare('UPDATE receivables SET chain_id = ?, registry_tx_hash = ?, updated_at = CURRENT_TIMESTAMP WHERE id = ?')
           .run(String(chainId), registryTxHash, newId);
       } else if (registryTxHash && !registryTxHash.startsWith('demo_')) {
+        db.prepare('UPDATE receivables SET registry_tx_hash = ?, updated_at = CURRENT_TIMESTAMP WHERE id = ?')
+          .run(registryTxHash, newId);
+      }
     } catch (chainErr) {
       console.warn('[register] On-chain call failed (demo ok):', chainErr.message);
       registryTxHash = `demo_reg_${Date.now().toString(36)}`;
