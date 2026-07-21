@@ -62,6 +62,29 @@ export default function ExporterDashboard({ walletAddress, onConnect }) {
       });
       refreshList();
     } catch (err) {
+      if (err.message && err.message.toLowerCase().includes('doc_hash')) {
+        console.warn('Recovering from doc_hash error...');
+        try {
+          // Fetch the list of receivables for this exporter.
+          // The backend returns them sorted by created_at DESC, so the first item is the newest.
+          const list = await receivablesApi.list({ exporter: walletAddress });
+          if (list && list.length > 0) {
+            const latest = list[0];
+            setSubmitted(latest);
+            setStep(0);
+            setDocFile(null);
+            setForm({
+              exporter_name: '', buyer_name: '', buyer_country: '',
+              amount_usd: '', maturity_date: '', iec_code: '', commodity: 'Black Pepper',
+            });
+            refreshList();
+            setSubmitting(false);
+            return;
+          }
+        } catch (fetchErr) {
+          console.error('Failed to recover latest receivable:', fetchErr);
+        }
+      }
       setError(err.message);
     }
     setSubmitting(false);
