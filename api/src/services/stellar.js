@@ -314,7 +314,7 @@ export async function createDexListing({ sellerAddress, assetCode, assetIssuer, 
   const issuerKp = getIssuerKeypair();
   const issuerAccount = await loadAccount(issuerKp.publicKey());
 
-  const USDC_ISSUER = 'GBBD47IF6LWK7P7MDEVSCWR7DPUWV3NY3DTQEVFL4NAT4AQH3ZLLFLA5';
+  const USDC_ISSUER = process.env.USDC_ISSUER || (NETWORK === 'mainnet' ? 'GA5ZSEJYB37JRC5AVCIA5MOP4RHTM335X2KGX3IHOJAPP5RE34K4KZVN' : 'GBBD47IF6LWK7P7MDEVSCWR7DPUWV3NY3DTQEVFL4NAT4AQH3ZLLFLA5');
   const sellingAsset = new Asset(assetCode, assetIssuer || issuerKp.publicKey());
   const buyingAsset  = new Asset('USDC', USDC_ISSUER);
 

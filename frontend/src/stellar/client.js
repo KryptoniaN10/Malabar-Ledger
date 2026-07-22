@@ -14,7 +14,7 @@ const HORIZON_URL = import.meta.env.VITE_HORIZON_URL || 'https://horizon-testnet
 const SOROBAN_RPC_URL = import.meta.env.VITE_STELLAR_RPC_URL || 'https://soroban-testnet.stellar.org';
 const API_URL = import.meta.env.VITE_API_URL || 'http://localhost:3001';
 const FRACTIONAL_SALE_CONTRACT_ID = import.meta.env.VITE_FRACTIONAL_SALE_CONTRACT_ID;
-const USDC_CONTRACT_ID = import.meta.env.VITE_USDC_CONTRACT_ID || 'CBIELTK6YBZJU5UP2WWQEUCYKLPU6AUNZ2BQ4WWFEIE3USCIHMXQDAMA';
+const USDC_CONTRACT_ID = import.meta.env.VITE_USDC_CONTRACT_ID || (NETWORK === 'mainnet' ? 'CCG4BK3PTQ5ZZU4PRBCO53UELBSDLCOU5PB4LJAWUBENMPBP5RRWKP7K' : 'CBIELTK6YBZJU5UP2WWQEUCYKLPU6AUNZ2BQ4WWFEIE3USCIHMXQDAMA');
 
 export const horizonServer = new Horizon.Server(HORIZON_URL);
 export const sorobanRpcServer = new SorobanRpc.Server(SOROBAN_RPC_URL, {
@@ -119,7 +119,7 @@ export async function getFreighterPublicKey() {
 // then submits to Horizon. Returns { hash } on success.
 // The escrow destination is the API issuer (production: a smart contract).
 export async function signTransactionWithFreighter({ investorAddress, paymentUsd, receivableId }) {
-  const USDC_ISSUER = 'GBBD47IF6LWK7P7MDEVSCWR7DPUWV3NY3DTQEVFL4NAT4AQH3ZLLFLA5';
+  const USDC_ISSUER = import.meta.env.VITE_USDC_ISSUER || (NETWORK === 'mainnet' ? 'GA5ZSEJYB37JRC5AVCIA5MOP4RHTM335X2KGX3IHOJAPP5RE34K4KZVN' : 'GBBD47IF6LWK7P7MDEVSCWR7DPUWV3NY3DTQEVFL4NAT4AQH3ZLLFLA5');
   const ESCROW_ADDRESS = import.meta.env.VITE_ESCROW_ADDRESS || investorAddress; // fallback to self in demo
 
   // Load investor account from Horizon

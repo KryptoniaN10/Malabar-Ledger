@@ -16,6 +16,10 @@ import {
 
 const router = express.Router();
 const PASSPHRASE = process.env.STELLAR_NETWORK_PASSPHRASE || Networks.TESTNET;
+const NETWORK = process.env.STELLAR_NETWORK || 'testnet';
+const STELLAR_EXPERT_BASE = NETWORK === 'mainnet'
+  ? 'https://stellar.expert/explorer/public'
+  : 'https://stellar.expert/explorer/testnet';
 
 function getIssuerKp() {
   if (!process.env.ISSUER_SECRET_KEY) return null;
@@ -79,7 +83,7 @@ router.post('/:id/confirm-payment', async (req, res, next) => {
       status: 'settled_pending',
       confirm_tx: confirmTxHash,
       stellar_expert_url: confirmTxHash && !confirmTxHash.startsWith('demo_')
-        ? `https://stellar.expert/explorer/testnet/tx/${confirmTxHash}`
+        ? `${STELLAR_EXPERT_BASE}/tx/${confirmTxHash}`
         : null,
       message: 'Payment confirmed. Ready to distribute to investors.',
     });
@@ -156,7 +160,8 @@ router.post('/:id/distribute', async (req, res, next) => {
     if (issuerKp && rec.token_asset_code) {
       try {
         const issuerAccount = await horizonServer.loadAccount(issuerKp.publicKey());
-        const usdcAsset = new Asset('USDC', 'GBBD47IF6LWK7P7MDEVSCWR7DPUWV3NY3DTQEVFL4NAT4AQH3ZLLFLA5');
+        const USDC_ISSUER = process.env.USDC_ISSUER || (NETWORK === 'mainnet' ? 'GA5ZSEJYB37JRC5AVCIA5MOP4RHTM335X2KGX3IHOJAPP5RE34K4KZVN' : 'GBBD47IF6LWK7P7MDEVSCWR7DPUWV3NY3DTQEVFL4NAT4AQH3ZLLFLA5');
+        const usdcAsset = new Asset('USDC', USDC_ISSUER);
 
         // Build a single transaction with all payment ops (up to 100 investors)
         const txBuilder = new TransactionBuilder(issuerAccount, {
@@ -206,9 +211,9 @@ router.post('/:id/distribute', async (req, res, next) => {
       status: 'settled',
       message: 'Pro-rata payout complete!',
       stellar_expert_url: paymentHashes[0]
-        ? `https://stellar.expert/explorer/testnet/tx/${paymentHashes[0]}`
+        ? `${STELLAR_EXPERT_BASE}/tx/${paymentHashes[0]}`
         : (distributeTxHash && !distributeTxHash.startsWith('demo_')
-          ? `https://stellar.expert/explorer/testnet/tx/${distributeTxHash}`
+          ? `${STELLAR_EXPERT_BASE}/tx/${distributeTxHash}`
           : null),
     });
   } catch (err) {
@@ -306,7 +311,7 @@ router.post('/:id/clawback', async (req, res, next) => {
       clawback_tx: clawbackTxHash,
       stellar_clawback_txs: clawbackHashes,
       stellar_expert_url: clawbackHashes[0]
-        ? `https://stellar.expert/explorer/testnet/tx/${clawbackHashes[0]}`
+        ? `${STELLAR_EXPERT_BASE}/tx/${clawbackHashes[0]}`
         : null,
       message: 'Clawback initiated on all receivable tokens',
     });
